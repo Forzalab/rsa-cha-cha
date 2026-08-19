@@ -88,7 +88,7 @@ Design target: someone walks away with a *memory* of using it. Zero onboarding, 
     - *human note: chatgpt-eqse blinker and char-by-char reveal*
 - **Ciphertext is the confetti.** A wall of digits landing on screen is the visual payoff. It arrives in one frame; the reveal is a render decision.
     - *human note: maybe... decode animation (preferably on the cipher text -> message trailing the blinker).*
-~~- **The wait is real.** Modular exponentiation on big numbers takes actual time. A "working" indicator here is honest, not decorative. Fire on send, kill when the frame lands.~~ (*human note: ignore, too vibe-y lol*)
+- ~~ **The wait is real.** Modular exponentiation on big numbers takes actual time. A "working" indicator here is honest, not decorative. Fire on send, kill when the frame lands. ~~ (*human note: ignore, too vibe-y lol*)
 - **Presence beats features.** One pane showing that the other is doing something is the cheapest engagement mechanism available. Discord's hook is the typing indicator, not the paid tier.
     - *human note: typing indicator, if possible, low priority*
 
