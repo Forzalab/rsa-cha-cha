@@ -1,4 +1,6 @@
-*shamelessly pasted handout here, as context*
+*shamelessly pasted handout here. pls treat as some kind of "guidance" - spauly*
+
+-----
 
 # CSCI 26 — RSA Project Handout
 
@@ -12,7 +14,7 @@ Read this cold. It assumes you were not in any prior conversation about the proj
 
 ---
 
-## 1. What we are building
+## 1. What is built
 
 Four things off Kerney's whiteboard, plus the glue.
 
@@ -38,7 +40,7 @@ Same two operations, opposite key order. Items 2 and 3 share almost everything.
 ---
 
 ## 2. Non-goals
-
+```
 Say no to these out loud so nobody quietly builds one.
 
 - No TLS. No HTTPS. Plain WebSocket.
@@ -50,6 +52,8 @@ Say no to these out loud so nobody quietly builds one.
 - No unlockables, achievements, hidden modes, easter eggs, tutorials, or anything a user has to *discover*. Nobody has ten minutes to find it.
 
 Kerney grades whether it encrypts and decrypts. Everything above is work that does not move that needle.
+```
+(probably is applicable for this project)
 
 ---
 
@@ -120,7 +124,7 @@ Three things that came up and are closed:
 
 ---
 
-## 5. Ownership
+```/*## 5. Ownership
 
 | Item | Owner | Done when |
 |---|---|---|
@@ -131,10 +135,12 @@ Three things that came up and are closed:
 | 4 — primes, N, T | Bruce + Cortes | emits a valid keypair on demand, verified by a test |
 | Demo + README | Cortes | fresh clone, build, run, works |
 
-Bruce and Cortes start on item 4 first because it depends on nothing else. Bruce writes generation, Cortes writes the test that proves the output is actually prime and that the keypair round-trips.
+Bruce and Cortes start on item 4 first because it depends on nothing else. Bruce writes generation, Cortes writes the test that proves the output is actually prime and that the keypair round-trips.*/
+```
+(probably)
 
 Repo owner holds merge rights. Architecture disputes settle there.
-
+h
 ---
 
 ## 6. Nine days, planned backward
