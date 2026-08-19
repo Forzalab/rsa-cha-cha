@@ -85,9 +85,12 @@ Design target: someone walks away with a *memory* of using it. Zero onboarding, 
 **Theater where it costs nothing, nowhere else.**
 
 - **Typewriter reveal on incoming plaintext.** A string, an index, a tick. Human-length message, so per-character is fine — this is the wrong place to build a dual-speed system. Append to the node, never re-render it.
+    - *human note: chatgpt-eqse blinker and char-by-char reveal*
 - **Ciphertext is the confetti.** A wall of digits landing on screen is the visual payoff. It arrives in one frame; the reveal is a render decision.
-- **The wait is real.** Modular exponentiation on big numbers takes actual time. A "working" indicator here is honest, not decorative. Fire on send, kill when the frame lands.
+    - *human note: maybe... decode animation (preferably on the cipher text -> message trailing the blinker).*
+~~- **The wait is real.** Modular exponentiation on big numbers takes actual time. A "working" indicator here is honest, not decorative. Fire on send, kill when the frame lands.~~ (*human note: ignore, too vibe-y lol*)
 - **Presence beats features.** One pane showing that the other is doing something is the cheapest engagement mechanism available. Discord's hook is the typing indicator, not the paid tier.
+    - *human note: typing indicator, if possible, low priority*
 
 **Bug triage, stated up front.** If something breaks, it should break in appearance or message content — visible, obvious, fixable during a demo. Do not spend the nine days on subtle edge cases, malformed-input hardening, or anything invisible. There is no attacker (see §2). A wrong character on screen matters here; an unhandled exotic input does not.
 
