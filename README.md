@@ -1,4 +1,4 @@
-*shamelessly pasted handout here. pls treat as some kind of "guidance" - spauly*
+*shamelessly pasted handout here. pls treat EVERYTHING BELOW as some kind of "guidance" - spauly*
 
 -----
 
@@ -124,8 +124,8 @@ Three things that came up and are closed:
 
 ---
 
-```/*## 5. Ownership
-
+## 5. Ownership
+```
 | Item | Owner | Done when |
 |---|---|---|
 | 1 — website | McKay (Tony polishes) | text in, ciphertext visible, plaintext out |
@@ -140,7 +140,7 @@ Bruce and Cortes start on item 4 first because it depends on nothing else. Bruce
 (probably)
 
 Repo owner holds merge rights. Architecture disputes settle there.
-h
+
 ---
 
 ## 6. Nine days, planned backward
