@@ -1,3 +1,3 @@
-import { test } from "./modules/RSA.mjs"
+import { test } from "./modules/RSA.js"
 
 test();
