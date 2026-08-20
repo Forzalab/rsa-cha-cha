@@ -1,5 +1,5 @@
 *shamelessly pasted handout here. pls treat EVERYTHING BELOW as some kind of "guidance". claude tends to give a "defensive/authoritative" voice - spauly*
-test edit
+
 -----
 
 # CSCI 26 — RSA Project Handout
