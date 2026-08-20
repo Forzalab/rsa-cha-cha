@@ -1,4 +1,4 @@
-#ifdef RSA_UTIL
+#ifndef RSA_UTIL
 #define RSA_UTIL
 
 #include <boost/multiprecision/cpp_int.hpp> //Bigint
@@ -6,12 +6,11 @@
 #include <boost/multiprecision/miller_rabin.hpp> //Prime testing
 #include <boost/math/constants/constants.hpp> //Has pi
 #include <cstdint> // unambigiuous int def
-
-#define int int32_t // icks if int is of unknown size lol
+#include <string> // bcs strings is rad
 
 using namespace std; // for convieniece
 
-using mp = boost::multiprecision;
+namespace mp = boost::multiprecision;
 using cpp_int = mp::cpp_int;
 using key = cpp_int;
 using prime_size = uint32_t;
@@ -24,18 +23,18 @@ class Utility {
 private:
     // anything private decl goes here
     // suggestions:
-    int gcd(const cpp_int& a, const cpp_int& b);
+    cpp_int gcd(const cpp_int& a, const cpp_int& b);
     
 public:
-    cpp_int get_new_prime(prime_size size);
-    cpp_int N(const cpp_int& p, const cpp_int& q);
-    cpp_int T(const cpp_int& p, const cpp_int& q); // totient
-    key E(const cpp_int& n);
-    key D(const key& e, const cpp_int& n);
+    static cpp_int get_new_prime(prime_size size);
+    static cpp_int N(const cpp_int& p, const cpp_int& q);
+    static cpp_int T(const cpp_int& p, const cpp_int& q); // totient
+    static key E(const cpp_int& n);
+    static key D(const key& e, const cpp_int& n);
 //    URLString get_visualization_url(); // undecided signature
-}
+};
 
-int Utility::gcd(const cpp_int& a, const cpp_int& b) {
+cpp_int Utility::gcd(const cpp_int& a, const cpp_int& b) {
     return 0;
 }
 
@@ -44,12 +43,12 @@ cpp_int Utility::get_new_prime(prime_size size) {
     return 0;
 }
 
-cpp_int Utility::N(const pair<cpp_int, cpp_int>& prime) {
+cpp_int Utility::N(const cpp_int& p, const cpp_int& q) {
     // Implement N here
     return 0;
 }
 
-cpp_int Utility:::T(const pair<cpp_int, cpp_int>& prime) {
+cpp_int Utility::T(const cpp_int& p, const cpp_int& q) {
     // T function here
     return 0;
 }
