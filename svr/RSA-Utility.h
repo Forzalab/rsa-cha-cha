@@ -23,7 +23,7 @@ class Utility {
 private:
     // anything private decl goes here
     // suggestions:
-    cpp_int gcd(const cpp_int& a, const cpp_int& b);
+    static cpp_int gcd(const cpp_int& a, const cpp_int& b);
     
 public:
     static cpp_int get_new_prime(prime_size size);
@@ -34,30 +34,30 @@ public:
 //    URLString get_visualization_url(); // undecided signature
 };
 
-cpp_int Utility::gcd(const cpp_int& a, const cpp_int& b) {
+inline cpp_int Utility::gcd(const cpp_int& a, const cpp_int& b) {
     return 0;
 }
 
-cpp_int Utility::get_new_prime(prime_size size) {
+inline cpp_int Utility::get_new_prime(prime_size size) {
     // Implement prime gen here
     return 0;
 }
 
-cpp_int Utility::N(const cpp_int& p, const cpp_int& q) {
+inline cpp_int Utility::N(const cpp_int& p, const cpp_int& q) {
     // Implement N here
     return 0;
 }
 
-cpp_int Utility::T(const cpp_int& p, const cpp_int& q) {
+inline cpp_int Utility::T(const cpp_int& p, const cpp_int& q) {
     // T function here
     return 0;
 }
 
-key Utility::E(const cpp_int& n) {
+inline key Utility::E(const cpp_int& n) {
     return 0;
 }    
 
-key Utility::D(const key& e, const cpp_int& n) {
+inline key Utility::D(const key& e, const cpp_int& n) {
     return 0;
 }    
 
