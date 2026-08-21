@@ -29,9 +29,9 @@ public:
     static cpp_int get_new_prime(prime_size size);
     static cpp_int N(const cpp_int& p, const cpp_int& q);
     static cpp_int T(const cpp_int& p, const cpp_int& q); // totient
-    static key E(const cpp_int& n); /// google for what e should be
-    static key D(const key& e, const cpp_int& n); // hint: n -> t -> d im so lazy
-//    URLString get_visualization_url(); // undecided signature
+    static key E(const cpp_int& t); /// google for what e should be
+    static key D(const key& e, const cpp_int& t);
+    URLString get_visualization_url(); // MUST return a string - param can be anything u please
 };
 
 inline cpp_int Utility::gcd(const cpp_int& a, const cpp_int& b) {
