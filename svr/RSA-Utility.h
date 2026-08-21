@@ -35,30 +35,76 @@ public:
 };
 
 inline cpp_int Utility::gcd(const cpp_int& a, const cpp_int& b) {
-    return 0;
+    cpp_int x = a, y = b;
+	while(y != 0){
+		cpp_int temp = y;
+		y = x % y;
+		x = temp; 
+	}
+	return x;
 }
 
 inline cpp_int Utility::get_new_prime(prime_size size) {
     // Implement prime gen here
-    return 0;
+	std::boost::random::mt19937 gen(std::random_device{}());
+
+	cpp_int lower = mp::pow(cpp_int(10), digits - 1);
+	cpp_int upper = mp::pow(cpp_int(10), digits) - 1;
+
+	boost::random::uniform_int_distribution<cpp_int> dist(lower, upper);
+
+	cpp_int candidate;
+	do{
+		candidate = dist(gen);
+		if(candidate % 2 == 0) candidate += 1
+	}while (!mp::miller_rabin_test(candidate,25,gen));
+
+	return candidate;
 }
 
 inline cpp_int Utility::N(const cpp_int& p, const cpp_int& q) {
     // Implement N here
-    return 0;
+ cpp_int N = p * q;
+    return N;
 }
 
 inline cpp_int Utility::T(const cpp_int& p, const cpp_int& q) {
     // T function here
-    return 0;
+    T = (p-1) * (q-1);
+	return T;
 }
 
 inline key Utility::E(const cpp_int& n) {
-    return 0;
+    cpp_int E = 65537
+	if(gcd(E, n) == 1){
+	return E;
 }    
-
+E = 3;
+while (gcd(E,n) != 1){
+	e += 2;
+}
+	return E;
+}
 inline key Utility::D(const key& e, const cpp_int& n) {
-    return 0;
+   cpp_int old_r = e, r = n;
+   cpp_int old_s = 1, s = 0;
+
+   while(r != 0){
+cpp_int quotient = old_r / r;
+ 
+cpp_int temp_r = old_r - quotient * r; 
+old_r = r; 
+r = temp_r; 
+
+cpp_int temp_s = old_s - quotient * s;
+old_s = s;
+s = temp_s;
+   }
+
+cpp_int d = old_s % n;
+if (d<0) d+= n;
+
+	return d;
 }    
 
 #endif
