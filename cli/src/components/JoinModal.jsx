@@ -1,12 +1,39 @@
-import { useState } from 'react'
-import { KeyRound, LoaderCircle } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Check, KeyRound, LoaderCircle, RadioTower } from 'lucide-react'
 
 const USERNAME_PATTERN = /^[A-Za-z0-9_-]{2,20}$/
 
-export function JoinModal({ connectionStatus, serverError, onJoin, onClearError }) {
+const SECURITY_CHECKS = [
+  'Contacting NSA…',
+  'Reaching out to CCP…',
+  'Negotiating with your ISP…',
+  'Asking Bruce if it compiles…',
+  'Encrypting the loading screen…',
+  'Deleting absolutely nothing…',
+]
+
+export function JoinModal({ connectionStatus, serverError, onJoin, onClearError, onComplete }) {
   const [name, setName] = useState('')
   const [localError, setLocalError] = useState('')
+  const [phase, setPhase] = useState('form')
+  const [checksVisible, setChecksVisible] = useState(0)
   const busy = connectionStatus === 'connecting' || connectionStatus === 'joining'
+
+  useEffect(() => {
+    if (phase === 'loading') {
+      const timers = SECURITY_CHECKS.map((_, index) => window.setTimeout(() => setChecksVisible(index + 1), 430 * (index + 1)))
+      timers.push(window.setTimeout(() => setPhase('granted'), 430 * (SECURITY_CHECKS.length + 1)))
+      return () => timers.forEach(window.clearTimeout)
+    }
+    if (phase === 'granted') {
+      const timer = window.setTimeout(() => setPhase('exit'), 850)
+      return () => window.clearTimeout(timer)
+    }
+    if (phase === 'exit') {
+      const timer = window.setTimeout(onComplete, 650)
+      return () => window.clearTimeout(timer)
+    }
+  }, [onComplete, phase])
 
   async function submit(event) {
     event.preventDefault()
@@ -17,8 +44,29 @@ export function JoinModal({ connectionStatus, serverError, onJoin, onClearError 
     }
     setLocalError('')
     onClearError()
-    try { await onJoin(username) } catch { /* displayed by the socket hook */ }
+    try {
+      await onJoin(username)
+      setPhase('loading')
+    } catch { /* displayed by the socket hook */ }
   }
+
+  if (phase !== 'form') return (
+    <div className={`fixed inset-0 z-50 grid place-items-center overflow-hidden bg-[#05070c]/90 px-5 backdrop-blur-xl ${phase === 'exit' ? 'modal-exit' : ''}`}>
+      <div className="pointer-events-none absolute h-80 w-80 rounded-full bg-emerald-400/10 blur-3xl" />
+      <div className="relative w-full max-w-lg overflow-hidden rounded-3xl border border-emerald-300/15 bg-[#0b111c]/95 p-7 shadow-2xl shadow-black/60">
+        <div className="absolute inset-x-12 top-0 h-px bg-gradient-to-r from-transparent via-emerald-300 to-transparent" />
+        <div className="flex items-center justify-between border-b border-white/8 pb-5">
+          <div><p className="text-[10px] font-semibold uppercase tracking-[.22em] text-emerald-300">Identity clearance</p><h2 className="mt-1 text-xl font-semibold text-white">Establishing secure vibes</h2></div>
+          <div className="relative grid h-11 w-11 place-items-center rounded-full border border-emerald-300/15 text-emerald-300"><RadioTower size={19} /><span className="loading-orbit absolute inset-[-4px] rounded-full border border-transparent border-t-emerald-300/70" /></div>
+        </div>
+        <div className="min-h-64 space-y-3 py-6 font-mono text-sm">
+          {SECURITY_CHECKS.slice(0, checksVisible).map((check, index) => <div key={check} className="loading-line flex items-center gap-3 text-slate-400"><Check size={14} className={index === checksVisible - 1 && phase === 'loading' ? 'text-amber-300' : 'text-emerald-400'} /><span>{check}</span><span className="ml-auto text-[10px] text-slate-700">OK</span></div>)}
+          {phase === 'granted' || phase === 'exit' ? <div className="loading-line mt-6 rounded-xl border border-emerald-300/20 bg-emerald-400/8 px-4 py-3 text-center font-sans text-sm font-semibold tracking-wide text-emerald-300">CLEARANCE GRANTED (probably)</div> : <span className="inline-block h-4 w-2 animate-pulse bg-emerald-300/70" />}
+        </div>
+        <div className="h-1 overflow-hidden rounded-full bg-white/5"><div className="h-full bg-gradient-to-r from-emerald-400 to-cyan-300 transition-all duration-500" style={{ width: `${phase === 'granted' || phase === 'exit' ? 100 : Math.round((checksVisible / SECURITY_CHECKS.length) * 92)}%` }} /></div>
+      </div>
+    </div>
+  )
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center overflow-hidden bg-[#05070c]/80 px-5 backdrop-blur-xl">

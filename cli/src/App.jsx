@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Activity, ArrowDown, Fingerprint, ImagePlus, LockKeyhole, Radio, Send, ShieldCheck, Smile, SmilePlus, Users } from 'lucide-react'
 import { JoinModal } from './components/JoinModal.jsx'
 import { RsaMatrixBackground } from './components/RsaMatrixBackground.jsx'
@@ -20,6 +20,8 @@ export default function App() {
   const [openReactions, setOpenReactions] = useState(null)
   const [stickerPickerOpen, setStickerPickerOpen] = useState(false)
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false)
+  const [entryComplete, setEntryComplete] = useState(false)
+  const completeEntry = useCallback(() => setEntryComplete(true), [])
   const [showNewMessages, setShowNewMessages] = useState(false)
   const messageListRef = useRef(null)
   const atBottomRef = useRef(true)
@@ -69,7 +71,7 @@ export default function App() {
     <main onClick={() => { setOpenReactions(null); setStickerPickerOpen(false); setEmojiPickerOpen(false) }} className="aurora grid-glow relative min-h-screen overflow-hidden p-3 sm:p-7">
       <RsaMatrixBackground />
       <div className="scanlines pointer-events-none fixed inset-0 z-40 opacity-20" />
-      {!joined && <JoinModal connectionStatus={chat.status} serverError={chat.error} onJoin={chat.join} onClearError={chat.clearError} />}
+      {!entryComplete && <JoinModal connectionStatus={chat.status} serverError={chat.error} onJoin={chat.join} onClearError={chat.clearError} onComplete={completeEntry} />}
 
       <section className="chat-shell relative z-10 mx-auto flex h-[calc(100vh-1.5rem)] max-w-6xl overflow-hidden rounded-[1.75rem] border border-slate-300/10 shadow-[0_30px_100px_rgba(0,0,0,.55)] backdrop-blur-xl sm:h-[calc(100vh-3.5rem)]">
         <div className="pointer-events-none absolute inset-x-24 top-0 h-px bg-gradient-to-r from-transparent via-emerald-300/60 to-transparent" />
