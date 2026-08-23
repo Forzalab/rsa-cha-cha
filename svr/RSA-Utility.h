@@ -29,9 +29,9 @@ public:
     static cpp_int get_new_prime(prime_size size);
     static cpp_int N(const cpp_int& p, const cpp_int& q);
     static cpp_int T(const cpp_int& p, const cpp_int& q); // totient
-    static key E(const cpp_int& n);
-    static key D(const key& e, const cpp_int& n);
-//    URLString get_visualization_url(); // undecided signature
+    static key E(const cpp_int& t); /// google for what e should be
+    static key D(const key& e, const cpp_int& t);
+    static URLString get_visualization_url(); // MUST return a string - param can be anything u please. if change param, change it both at declaration + definition, or u will get compile err
 };
 
 inline cpp_int Utility::gcd(const cpp_int& a, const cpp_int& b) {
@@ -106,5 +106,11 @@ if (d<0) d+= n;
 
 	return d;
 }    
+
+inline URLString Utility::get_visualization_url() {
+    // this will need BRIDGES, but just complete the other ones first pls
+    // ill try to setup BRIDGES libs ASAP
+    return "";
+}
 
 #endif
