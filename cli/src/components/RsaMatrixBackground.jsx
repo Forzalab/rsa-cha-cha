@@ -40,7 +40,7 @@ export function RsaMatrixBackground() {
         speed: 38 + Math.random() * 34,
         token: Math.floor(Math.random() * TOKENS.length),
         phase: Math.random() * Math.PI * 2,
-        hue: Math.random() > 0.72 ? 'cyan' : 'emerald',
+        hue: Math.random() > 0.72 ? 'cyan' : 'amber',
       }))
     }
 
@@ -53,7 +53,7 @@ export function RsaMatrixBackground() {
       const delta = Math.min((time - previousFrame) / 1000, 0.08)
       previousFrame = time
       context.clearRect(0, 0, window.innerWidth, window.innerHeight)
-      context.font = '11px ui-monospace, SFMono-Regular, Consolas, monospace'
+      context.font = '11px "Space Mono", ui-monospace, Consolas, monospace'
       context.textBaseline = 'middle'
 
       for (const column of columns) {
@@ -68,8 +68,8 @@ export function RsaMatrixBackground() {
           if (y < -30 || y > window.innerHeight + 30) continue
           const alpha = (1 - trail / 8) * (0.17 + Math.sin(time / 1800 + column.phase) * 0.025)
           context.fillStyle = trail === 0
-            ? column.hue === 'cyan' ? `rgba(103, 232, 249, ${alpha + 0.08})` : `rgba(110, 231, 183, ${alpha + 0.08})`
-            : column.hue === 'cyan' ? `rgba(34, 211, 238, ${alpha})` : `rgba(45, 212, 191, ${alpha})`
+            ? column.hue === 'cyan' ? `rgba(103, 232, 249, ${alpha + 0.08})` : `rgba(252, 211, 77, ${alpha + 0.08})`
+            : column.hue === 'cyan' ? `rgba(34, 211, 238, ${alpha})` : `rgba(245, 158, 11, ${alpha})`
           context.fillText(TOKENS[(column.token + trail) % TOKENS.length], column.x, y)
         }
       }
