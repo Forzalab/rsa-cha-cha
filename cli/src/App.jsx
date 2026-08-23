@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { Activity, ArrowDown, Fingerprint, ImagePlus, LockKeyhole, Radio, Send, ShieldCheck, SmilePlus, Sparkles, Users } from 'lucide-react'
+import { Activity, ArrowDown, Fingerprint, ImagePlus, LockKeyhole, Radio, Send, ShieldCheck, Smile, SmilePlus, Users } from 'lucide-react'
 import { JoinModal } from './components/JoinModal.jsx'
 import { RsaMatrixBackground } from './components/RsaMatrixBackground.jsx'
 import { useChatSocket } from './hooks/useChatSocket.js'
 import { parseStickerMessage, STICKERS, stickerShortcode } from './lib/stickers.js'
+import { EMOJIS } from './lib/emojis.js'
 
 function StickerImage({ sticker, compact = false }) {
   const [failed, setFailed] = useState(false)
@@ -18,11 +19,11 @@ export default function App() {
   const [sendPulse, setSendPulse] = useState(false)
   const [openReactions, setOpenReactions] = useState(null)
   const [stickerPickerOpen, setStickerPickerOpen] = useState(false)
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false)
   const [showNewMessages, setShowNewMessages] = useState(false)
   const messageListRef = useRef(null)
   const atBottomRef = useRef(true)
   const previousMessageCountRef = useRef(0)
-  const reactionChoices = ['👍', '❤️', '😂', '🔥', '🤯']
 
   function scrollToNewest(behavior = 'smooth') {
     const list = messageListRef.current
@@ -65,14 +66,14 @@ export default function App() {
   }
 
   return (
-    <main onClick={() => { setOpenReactions(null); setStickerPickerOpen(false) }} className="aurora grid-glow relative min-h-screen overflow-hidden p-3 sm:p-7">
+    <main onClick={() => { setOpenReactions(null); setStickerPickerOpen(false); setEmojiPickerOpen(false) }} className="aurora grid-glow relative min-h-screen overflow-hidden p-3 sm:p-7">
       <RsaMatrixBackground />
       <div className="scanlines pointer-events-none fixed inset-0 z-40 opacity-20" />
       {!joined && <JoinModal connectionStatus={chat.status} serverError={chat.error} onJoin={chat.join} onClearError={chat.clearError} />}
 
-      <section className="relative z-10 mx-auto flex h-[calc(100vh-1.5rem)] max-w-6xl overflow-hidden rounded-[1.75rem] border border-white/10 bg-[#0a0e16]/85 shadow-[0_30px_100px_rgba(0,0,0,.55)] backdrop-blur-xl sm:h-[calc(100vh-3.5rem)]">
+      <section className="chat-shell relative z-10 mx-auto flex h-[calc(100vh-1.5rem)] max-w-6xl overflow-hidden rounded-[1.75rem] border border-slate-300/10 shadow-[0_30px_100px_rgba(0,0,0,.55)] backdrop-blur-xl sm:h-[calc(100vh-3.5rem)]">
         <div className="pointer-events-none absolute inset-x-24 top-0 h-px bg-gradient-to-r from-transparent via-emerald-300/60 to-transparent" />
-        <aside className="hidden w-64 shrink-0 border-r border-white/8 bg-white/[.015] p-5 md:flex md:flex-col">
+        <aside className="chat-sidebar hidden w-64 shrink-0 border-r border-slate-300/8 p-5 md:flex md:flex-col">
           <div className="flex items-center gap-3 text-white"><span className="relative grid h-9 w-9 place-items-center rounded-xl border border-emerald-300/20 bg-emerald-400/10"><Fingerprint className="text-emerald-300" size={20} /><span className="status-pulse absolute inset-0 rounded-xl border border-emerald-300/30" /></span><div><span className="block font-semibold tracking-tight">RSA Cha-Cha</span><span className="block text-[10px] uppercase tracking-[.2em] text-slate-600">Secure channel</span></div></div>
           <div className="mt-10 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-500"><Users size={14} /> In the room</div>
           <div className="mt-4 space-y-2">
@@ -91,15 +92,15 @@ export default function App() {
           </div>
         </aside>
 
-        <div className="relative flex min-w-0 flex-1 flex-col">
-          <header className="flex h-20 items-center justify-between border-b border-white/8 bg-white/[.01] px-5 sm:px-7">
+        <div className="chat-pane relative flex min-w-0 flex-1 flex-col">
+          <header className="chat-header flex h-20 items-center justify-between border-b border-slate-300/8 px-5 sm:px-7">
             <div className="flex items-center gap-3"><span className="relative grid h-10 w-10 place-items-center rounded-xl border border-cyan-300/10 bg-cyan-300/5 text-cyan-300"><Radio size={18} /><span className="status-pulse absolute inset-0 rounded-xl border border-cyan-300/20" /></span><div><h2 className="font-semibold tracking-tight text-white">Encrypted room</h2><p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500"><Activity size={11} className="text-emerald-400" />{joined ? `${chat.members.length} online · ${chat.username}` : 'Waiting to join'}</p></div></div>
-            <span className="flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/5 px-3 py-1.5 text-xs text-emerald-300 shadow-inner shadow-emerald-300/5"><Sparkles size={12} /> End-to-end RSA</span>
+            <span className="flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/5 px-3 py-1.5 text-xs text-emerald-300 shadow-inner shadow-emerald-300/5"> End-to-end RSA</span>
           </header>
 
           <div ref={messageListRef} onScroll={handleMessageScroll} className="flex flex-1 flex-col gap-5 overflow-y-auto scroll-smooth p-5 sm:p-7">
             {chat.messages.length === 0 && (
-              <div className="m-auto max-w-sm text-center"><LockKeyhole className="mx-auto text-slate-700" size={38} /><h3 className="mt-4 font-medium text-slate-300">The room is quiet</h3><p className="mt-2 text-sm leading-6 text-slate-600">Open another browser tab, join with a different name, and send the first encrypted message.</p></div>
+              <div className="m-auto max-w-sm text-center"><LockKeyhole className="mx-auto text-slate-700" size={38} /><h3 className="mt-4 font-medium text-slate-300">The room is quiet</h3><p className="mt-2 text-sm leading-6 text-slate-600">Open another browser tab, join with a different name, or have a classmate join then send the first encrypted message!</p></div>
             )}
             {chat.messages.map((message) => {
               const own = message.sender === chat.username
@@ -116,7 +117,7 @@ export default function App() {
                       {caption && <p className={`mx-1 mt-1 rounded-xl px-3 py-2.5 text-sm leading-6 ${own ? 'bg-emerald-400 text-emerald-950' : 'bg-white/[.06] text-slate-200'}`}>{caption}</p>}
                     </div>
                   ) : (
-                    <div className={`bubble-arrive rounded-2xl border px-4 py-3 text-sm leading-6 shadow-lg ${own ? 'rounded-br-md border-emerald-200/20 bg-gradient-to-br from-emerald-300 to-emerald-400 text-emerald-950 shadow-emerald-950/20' : 'rounded-bl-md border-white/8 bg-white/[.055] text-slate-200 shadow-black/20 backdrop-blur-md'}`}>{message.plaintext}</div>
+                    <div className={`bubble-arrive rounded-2xl border px-4 py-3 text-sm leading-6 shadow-lg ${own ? 'rounded-br-md border-emerald-200/20 bg-gradient-to-br from-emerald-300 to-teal-400 text-emerald-950 shadow-emerald-950/20' : 'rounded-bl-md border-slate-300/10 bg-slate-700/25 text-slate-100 shadow-black/20 backdrop-blur-md'}`}>{message.plaintext}</div>
                   )}
                   <div className={`relative mt-2 flex h-7 items-center gap-1.5 ${own ? 'justify-end' : ''}`}>
                     {visibleReactions.map(([emoji, people]) => (
@@ -127,7 +128,8 @@ export default function App() {
                       <div onClick={(event) => event.stopPropagation()} className={`reaction-pop absolute bottom-9 z-30 min-w-52 rounded-2xl border border-white/10 bg-[#111722]/95 p-2 shadow-2xl shadow-black/50 backdrop-blur-xl ${own ? 'right-0' : 'left-0'}`}>
                         {reactions.length > 0 && <p className="px-2 pb-1.5 text-[10px] font-semibold uppercase tracking-[.16em] text-slate-600">Reactions</p>}
                         {reactions.length > 0 && <div className="mb-2 flex flex-wrap gap-1 border-b border-white/8 pb-2">{reactions.map(([emoji, people]) => <button type="button" key={emoji} onClick={() => chat.react(message.id, emoji)} title={people.join(', ')} className={`flex items-center gap-1 rounded-full px-2 py-1 text-xs transition ${people.includes(chat.username) ? 'bg-emerald-400/15 ring-1 ring-emerald-300/25' : 'bg-white/5 hover:bg-emerald-400/10'}`}><span>{emoji}</span><span className="text-[10px] text-slate-500">{people.length}</span></button>)}</div>}
-                        <div className="flex items-center"><SmilePlus className="mx-1.5 text-slate-500" size={13} />{reactionChoices.map((emoji) => <button type="button" key={emoji} onClick={() => { chat.react(message.id, emoji); setOpenReactions(null) }} className="grid h-8 w-8 place-items-center rounded-full text-base transition hover:scale-125 hover:bg-white/8" aria-label={`React with ${emoji}`}>{emoji}</button>)}</div>
+                        <div className="mb-1 flex items-center gap-1 px-1 text-[10px] font-semibold uppercase tracking-[.16em] text-slate-600"><SmilePlus size={12} /> Add reaction</div>
+                        <div className="grid max-h-40 w-64 grid-cols-8 gap-0.5 overflow-y-auto pr-1">{EMOJIS.map((emoji) => <button type="button" key={emoji} onClick={() => { chat.react(message.id, emoji); setOpenReactions(null) }} className="grid h-8 w-8 place-items-center rounded-lg text-base transition hover:scale-125 hover:bg-white/8" aria-label={`React with ${emoji}`}>{emoji}</button>)}</div>
                       </div>
                     )}
                   </div>
@@ -139,7 +141,7 @@ export default function App() {
 
           <button type="button" tabIndex={showNewMessages ? 0 : -1} aria-hidden={!showNewMessages} onClick={() => scrollToNewest()} className={`absolute bottom-[5.7rem] left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-emerald-200/25 bg-emerald-400 px-4 py-2 text-xs font-semibold text-emerald-950 shadow-xl shadow-black/40 transition-all duration-300 hover:bg-emerald-300 md:hidden ${showNewMessages ? 'new-message-badge opacity-100' : 'pointer-events-none translate-y-2 opacity-0'}`}><ArrowDown size={14} /> New messages</button>
 
-          <form className="relative border-t border-white/8 bg-black/10 p-4 sm:p-5" onSubmit={send}>
+          <form className="chat-composer relative border-t border-slate-300/8 p-4 sm:p-5" onSubmit={send}>
             {stickerPickerOpen && (
               <div onClick={(event) => event.stopPropagation()} className="sticker-pop absolute bottom-[5.4rem] left-4 z-30 w-[min(26rem,calc(100vw-2rem))] rounded-2xl border border-white/10 bg-[#111722]/95 p-3 shadow-2xl shadow-black/60 backdrop-blur-xl sm:left-5">
                 <div className="mb-3 flex items-center justify-between px-1"><div><p className="text-sm font-semibold text-slate-200">Class stickers</p><p className="mt-0.5 text-[10px] text-slate-600">Pick one or type its :shortcode:</p></div><ImagePlus size={17} className="text-emerald-300" /></div>
@@ -148,8 +150,17 @@ export default function App() {
                 </div>
               </div>
             )}
-            <div className="flex items-end gap-2 rounded-2xl border border-white/10 bg-black/25 p-2 shadow-inner shadow-black/20 transition duration-300 focus-within:border-emerald-400/35 focus-within:shadow-[0_0_30px_rgba(52,211,153,.06)]">
-              <button type="button" onClick={(event) => { event.stopPropagation(); setStickerPickerOpen((open) => !open); setOpenReactions(null) }} disabled={!joined} aria-label="Open image picker" className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl border transition disabled:opacity-30 ${stickerPickerOpen ? 'border-emerald-300/30 bg-emerald-400/10 text-emerald-300' : 'border-transparent text-slate-500 hover:bg-white/5 hover:text-slate-300'}`}><ImagePlus size={19} /></button>
+            {emojiPickerOpen && (
+              <div onClick={(event) => event.stopPropagation()} className="sticker-pop absolute bottom-[5.4rem] left-4 z-30 w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-white/10 bg-[#111722]/95 p-3 shadow-2xl shadow-black/60 backdrop-blur-xl sm:left-5">
+                <div className="mb-3 flex items-center justify-between px-1"><div><p className="text-sm font-semibold text-slate-200">Emoji</p><p className="mt-0.5 text-[10px] text-slate-600">Add some personality to your message</p></div><Smile size={17} className="text-emerald-300" /></div>
+                <div className="grid max-h-64 grid-cols-8 gap-1 overflow-y-auto pr-1">
+                  {EMOJIS.map((emoji) => <button type="button" key={emoji} onClick={() => setDraft((current) => `${current}${current && !current.endsWith(' ') ? ' ' : ''}${emoji}`)} className="grid aspect-square place-items-center rounded-lg text-xl transition duration-150 hover:scale-125 hover:bg-emerald-400/10" aria-label={`Add ${emoji}`}>{emoji}</button>)}
+                </div>
+              </div>
+            )}
+            <div className="flex items-end gap-2 rounded-2xl border border-white/10 bg-black/25 p-2 shadow-inner shadow-black/20 transition-all duration-300 hover:border-white/20 hover:bg-black/30 hover:shadow-[0_0_24px_rgba(52,211,153,.045)] focus-within:border-emerald-400/35 focus-within:bg-black/30 focus-within:shadow-[0_0_32px_rgba(52,211,153,.085)]">
+              <button type="button" onClick={(event) => { event.stopPropagation(); setStickerPickerOpen((open) => !open); setEmojiPickerOpen(false); setOpenReactions(null) }} disabled={!joined} aria-label="Open image picker" className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl border transition disabled:opacity-30 ${stickerPickerOpen ? 'border-emerald-300/30 bg-emerald-400/10 text-emerald-300' : 'border-transparent text-slate-500 hover:bg-white/5 hover:text-slate-300'}`}><ImagePlus size={19} /></button>
+              <button type="button" onClick={(event) => { event.stopPropagation(); setEmojiPickerOpen((open) => !open); setStickerPickerOpen(false); setOpenReactions(null) }} disabled={!joined} aria-label="Open emoji picker" className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl border transition disabled:opacity-30 ${emojiPickerOpen ? 'border-emerald-300/30 bg-emerald-400/10 text-emerald-300' : 'border-transparent text-slate-500 hover:bg-white/5 hover:text-slate-300'}`}><Smile size={19} /></button>
               <textarea value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) send(event) }} disabled={!joined} rows="1" placeholder="Message the room…" className="max-h-32 min-h-11 flex-1 resize-none bg-transparent px-3 py-3 text-sm text-slate-300 outline-none placeholder:text-slate-600" />
               <button disabled={!joined || !draft.trim()} aria-label="Send message" className={`group grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br from-emerald-300 to-teal-400 text-emerald-950 shadow-lg shadow-emerald-950/30 transition duration-200 hover:-translate-y-0.5 hover:shadow-emerald-400/20 active:translate-y-0 disabled:opacity-30 ${sendPulse ? 'send-burst' : ''}`}><Send className="transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" size={18} /></button>
             </div>

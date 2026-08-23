@@ -11,7 +11,19 @@
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 320px; min-height: 100vh; }
 button, input, textarea { font: inherit; }
-button { -webkit-tap-highlight-color: transparent; }
+button {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+summary,
+[role="button"] {
+  cursor: pointer;
+}
 
 ::selection { color: #022c22; background: #6ee7b7; }
 * { scrollbar-width: thin; scrollbar-color: rgba(52, 211, 153, .28) transparent; }
@@ -48,6 +60,32 @@ button { -webkit-tap-highlight-color: transparent; }
 .rsa-matrix {
   opacity: .72;
   mask-image: linear-gradient(to right, black, rgba(0, 0, 0, .45) 48%, black);
+}
+
+.chat-shell {
+  background:
+    linear-gradient(135deg, rgba(17, 27, 45, .96), rgba(8, 15, 27, .96) 58%, rgba(10, 25, 32, .94));
+}
+
+.chat-sidebar {
+  background:
+    radial-gradient(circle at 20% 0%, rgba(45, 212, 191, .055), transparent 34%),
+    linear-gradient(180deg, rgba(18, 29, 47, .82), rgba(10, 18, 31, .92));
+}
+
+.chat-pane {
+  background:
+    radial-gradient(circle at 72% 18%, rgba(59, 130, 246, .035), transparent 28%),
+    radial-gradient(circle at 28% 80%, rgba(20, 184, 166, .025), transparent 30%),
+    rgba(8, 15, 27, .72);
+}
+
+.chat-header {
+  background: linear-gradient(90deg, rgba(20, 31, 50, .72), rgba(11, 24, 34, .48));
+}
+
+.chat-composer {
+  background: linear-gradient(180deg, rgba(11, 19, 32, .72), rgba(8, 14, 25, .92));
 }
 
 .message-enter-left { animation: message-in-left .9s cubic-bezier(.16, .9, .25, 1) both; }
