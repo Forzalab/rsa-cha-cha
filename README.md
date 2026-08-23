@@ -1,4 +1,4 @@
-*shamelessly pasted handout here. pls treat EVERYTHING BELOW as some kind of "guidance". claude tends to give a "defensive/authoritative" voice - spauly*
+*shamelessly pasted handout here. just... dont... read it, its a backup of a wordsalad thta happens to run :))) - spauly*
 
 -----
 
