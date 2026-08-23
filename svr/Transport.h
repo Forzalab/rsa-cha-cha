@@ -12,6 +12,7 @@
 #include <nlohmann/json.hpp>
 
 #include <deque>
+#include <chrono>
 #include <iostream>
 #include <map>
 #include <memory>
@@ -53,6 +54,7 @@ class Session : public std::enable_shared_from_this<Session> {
     const std::string& userid() const { return userid_; }
     void set_userid(std::string id) { userid_ = std::move(id); }
     bool joined() const { return !userid_.empty(); }
+    bool allow_send(const json& msg);
 
    private:
     void on_accept(bb::error_code ec);
@@ -66,6 +68,9 @@ class Session : public std::enable_shared_from_this<Session> {
     std::deque<std::string> out_;  // your chatchapoon mailbox, minus the locks
     Hub& hub_;
     std::string userid_;
+    std::deque<std::chrono::steady_clock::time_point> recent_sends_;
+    std::chrono::steady_clock::time_point last_logical_send_{};
+    std::string last_event_id_;
 };
 
 
@@ -154,6 +159,30 @@ inline void Session::send(const json& msg) {
     if (out_.size() == 1) do_write();
 }
 
+inline bool Session::allow_send(const json& msg) {
+    const auto now = std::chrono::steady_clock::now();
+    const auto window = std::chrono::seconds(2);
+    while (!recent_sends_.empty() && now - recent_sends_.front() >= window)
+        recent_sends_.pop_front();
+
+    // A single room event becomes one SEND per recipient, all sharing an
+    // event_id. Apply the 400ms cooldown only when a new logical event starts.
+    const json content = msg.value("content", json::object());
+    const std::string event_id = content.value("event_id", content.value("message_id", ""));
+    if (event_id.empty()) return false;
+    if (event_id != last_event_id_) {
+        if (!last_event_id_.empty() && now - last_logical_send_ < std::chrono::milliseconds(400))
+            return false;
+        last_event_id_ = event_id;
+        last_logical_send_ = now;
+    }
+
+    // Also retain a hard frame ceiling for malformed or deliberately reused IDs.
+    if (recent_sends_.size() >= 20) return false;
+    recent_sends_.push_back(now);
+    return true;
+}
+
 inline void Session::do_write() {
     ws_.async_write(bo::buffer(out_.front()),
                     bb::bind_front_handler(&Session::on_write, shared_from_this()));
@@ -188,7 +217,10 @@ inline void Hub::route(const std::shared_ptr<Session>& from, const std::string& 
     } else if (request == "LOOKUP") {
         do_lookup(from, msg);
     } else if (request == "SEND") {
-        do_send(from, msg);
+        if (!from->allow_send(msg))
+            from->send(envelope("SERVER", from->userid(), "ERR_RATE_LIMIT"));
+        else
+            do_send(from, msg);
     } else {
         from->send(envelope("SERVER", from->userid(), "ERR_UNSPC"));
     }

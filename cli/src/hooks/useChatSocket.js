@@ -3,9 +3,12 @@ import { errorText, joinMessage, parseFrame, sendMessage } from '../lib/protocol
 import { decryptText, DEV_KEYPAIR, encryptText } from '../lib/rsa.js'
 
 const DEFAULT_URL = `ws://${window.location.hostname || 'localhost'}:6868`
+const MAX_MESSAGE_LENGTH = 500
+const SEND_COOLDOWN_MS = 400
 export function useChatSocket(url = import.meta.env.VITE_WS_URL || DEFAULT_URL) {
   const socketRef = useRef(null)
   const pendingJoinRef = useRef(null)
+  const lastSendAtRef = useRef(0)
   const [status, setStatus] = useState('connecting')
   const [username, setUsername] = useState('')
   const [members, setMembers] = useState([])
@@ -107,12 +110,16 @@ export function useChatSocket(url = import.meta.env.VITE_WS_URL || DEFAULT_URL) 
   const send = useCallback((plaintext) => {
     const socket = socketRef.current
     if (!socket || socket.readyState !== WebSocket.OPEN || !username) return false
+    if ([...plaintext].length > MAX_MESSAGE_LENGTH) return false
+    const now = Date.now()
+    if (now - lastSendAtRef.current < SEND_COOLDOWN_MS) return false
+    lastSendAtRef.current = now
 
     const cipher = encryptText(plaintext)
     const messageId = crypto.randomUUID()
     const recipients = members.filter((member) => member !== username)
     for (const recipient of recipients) {
-      socket.send(JSON.stringify(sendMessage(username, recipient, cipher, { message_id: messageId })))
+      socket.send(JSON.stringify(sendMessage(username, recipient, cipher, { message_id: messageId, event_id: messageId })))
     }
     setMessages((current) => [...current, {
       id: messageId, sender: username, plaintext, cipher, reactions: {},
@@ -126,9 +133,10 @@ export function useChatSocket(url = import.meta.env.VITE_WS_URL || DEFAULT_URL) 
     const cipher = encryptText(emoji)
     const message = messages.find((item) => item.id === messageId)
     const action = message?.reactions?.[emoji]?.includes(username) ? 'REMOVE' : 'ADD'
+    const eventId = crypto.randomUUID()
     for (const recipient of members.filter((member) => member !== username)) {
       socket.send(JSON.stringify(sendMessage(username, recipient, cipher, {
-        kind: 'REACTION', message_id: messageId, reaction_action: action,
+        kind: 'REACTION', message_id: messageId, event_id: eventId, reaction_action: action,
       })))
     }
     applyReaction(messageId, emoji, username, action)

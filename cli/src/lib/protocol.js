@@ -31,6 +31,7 @@ export function errorText(request) {
     ERR_NO_USER: 'That user is no longer connected.',
     ERR_BAD_JSON: 'The server could not read that message.',
     ERR_UNSPC: 'The server does not support that request.',
+    ERR_RATE_LIMIT: 'You are sending messages too quickly.',
   }
   return messages[request] ?? 'Something went wrong.'
 }
