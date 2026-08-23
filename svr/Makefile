@@ -1,5 +1,5 @@
 CXX      = g++
-CCFLAGS  = -Ilibs/include -Isvr \
+CCFLAGS  = -Iinclude -I. \
            -std=c++26 -g \
            -Wall -Wfatal-errors -Wno-sign-compare \
            -D_GLIBCXX_DEBUG -fsanitize=undefined -fsanitize=address
@@ -35,7 +35,7 @@ check:
 	else echo "^^^ fix these before pushing."; exit 1; fi
 
 clean:
-	@rm -f svr/*.o svr/*.d server
+	@rm -f *.o *.d server
 	@echo "cleaned"
 
 .PHONY: check clean
