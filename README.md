@@ -6,19 +6,13 @@
 
 **Team:** Tony (repo owner), McKay Seamons, Bruce
 **Due:** Thursday Aug 27, 12:00pm — hard
-**Written:** Tue Aug 18. **Revised:** Wed Aug 20, 01:10. Eight days on the clock.
+**Written:** Tue Aug 18. **Revised:** Sat Aug 22, 19:05. Five days to deadline; four to freeze.
+
+**Now (Sat Aug 22):** verb schema drafted (§5a) — needs Tony's redline, then goes to McKay. Transport implementation next. Four working days to the Wed Aug 26 freeze.
 
 Read this cold. It assumes you were not in any prior conversation about the project.
 
 **Everything here is tentative.** This is a guideline, not a contract. Any decision below is open to renegotiation by anyone on the team at any time — bring a reason, not a preference, and we change it. Nothing in this document is worth defending past the point where it stops helping.
-
----
-
-## 0. Orientation — read this first, skip the rest until you need it
-
-> **UNWRITTEN — Tony fills this in.** Five lines, one per person:
-> who you are · what you own · when it's due · where the repo is · who to ask when stuck.
-> Everything below §0 assumes context this block is supposed to supply.
 
 ---
 
@@ -29,8 +23,8 @@ Five things off Kerney's whiteboard.
 | # | Item | Stack |
 |---|------|-------|
 | 1 | User interface — a website | web |
-| 2 | RSA encrypt & decrypt | C++ |
-| 3 | RSA signature & verification | C++ |
+| 2 | RSA encrypt & decrypt | C++ (canonical) + JS port |
+| 3 | RSA signature & verification | C++ (canonical) + JS port |
 | 4 | Generate primes, N, T | C++ |
 | 5 | **& BRIDGES** — visualize a structure, get back a URL | C++ |
 
@@ -45,7 +39,9 @@ verify:   S       + public key   →  message
 
 Same two operations, opposite key order. Items 2 and 3 share almost everything.
 
-**"& BRIDGES" is the BRIDGES visualization library.** Not "bridging two languages" — that misreading cost a full session. A function hands BRIDGES a structure and gets back a working URL. Planned surface: a `More > Visualize using BRIDGES` affordance in the chat UI. *Open: what structure actually gets visualized, and whether the button belongs to item 1 or item 5.*
+**"& BRIDGES" is the BRIDGES visualization library.** Not "bridging two languages" — that misreading cost a full session. A function hands BRIDGES a structure and gets back a working URL. Planned surface: a `More > Visualize using BRIDGES` affordance in the chat UI. **How it installs — answered, from our own history.** `Forzalab/particle-raincheck` already did this: the whole library is vendored into the repo at `libs/include/`, no package manager, and the Makefile carries `-Ilibs/include -lcurl`. It is *not* header-only — `-lcurl` is a real link dependency. BRIDGES also needs `setApiKey()` and `setUserName()`; the URL comes back from their server, so somebody registers an account before `get_visualization_url` can return anything. `Bifrost.h` in that repo is a working wrapper to crib from.
+
+*Open: what structure actually gets visualized, and whether the button belongs to item 1 or item 5.*
 
 ---
 
@@ -105,30 +101,32 @@ Smoothness over polish. Immediate over impressive.
 
 ---
 
-## 4. Architecture — settled Aug 20, do not reopen without a reason
+## 4. Architecture — revised Aug 20 13:45
 
-The server is a **relay, a public-key directory, and the crypto engine.** All RSA math runs server-side in C++.
+The server is a **relay, a public-key directory, and a crypto engine.** The browser is also a crypto engine. **RSA exists on both sides.**
 
 ```
-A joins       →  A registers with S, S issues/holds A's keypair
-A sends       →  A sends plaintext to S
-S encrypts    →  S looks up Bpub, encrypts, stores + relays the ciphertext
-B receives    →  S decrypts with Bpriv, B displays plaintext
+A joins       →  A registers with S, S issues/holds the keypairs
+A sends       →  A encrypts in the browser (JS), ships ciphertext
+S relays      →  S stores + relays; S can encrypt/decrypt/sign/verify itself
+B receives    →  B decrypts in the browser, or S decrypts and sends plaintext
 ```
 
 Every round-trip is ACKed.
 
-- **Plaintext crosses the wire on the initial send.** Agreed by Tony and McKay, Aug 20. The server is the source of truth; there is no way around plaintext reaching it if it is the thing doing the math. This is the no-hardening rule (§2) applied consistently — there is no attacker in this project, and Kerney grades whether it encrypts and decrypts.
+- **C++ is canonical.** `svr/RSA-Utility.h` is the reference implementation and the thing explained out loud at the demo. The JS side is a port of the same standardized algorithm, not a separate design.
+- **Kerney does not penalize the duplication.** Confirmed by Tony, Aug 20: it needs to work, that is the whole bar. The usual over-engineering objection does not apply here.
 - **`USERID` is a required field.** The server tracks who sent what, and the UI needs it to label messages.
 - **Rejected:** hop-by-hop re-encryption through an `Spub`/`Spriv` pair. Sketched Aug 19, scratched the same night.
-- **Rejected:** browser-side crypto with each party holding its own private key. Considered seriously and reversed — see the consequence below.
 - **Not pursued:** true P2P with no middleman. Possible in principle, out of scope for seven days.
 
-**Consequence — RSA gets written ONCE, in C++.** This is the entire reason the decision is worth taking. Browser-held keys would have forced a second full implementation in JS `BigInt` on a seven-day clock. The browser now sends strings and renders strings; the only big numbers it touches are ciphertext it displays.
+**Cost, stated honestly.** Two implementations means two places to be wrong and two things to explain with the file closed. The mitigation is that they are the *same algorithm* — port, do not redesign, and test both against one hardcoded keypair so a mismatch shows up immediately.
+
+**Deadline on this decision: Sun Aug 23.** If the JS port is not round-tripping by then, it gets cut and the server does all the math. That fallback costs nothing because C++ is canonical either way.
 
 **Signatures answer impersonation.** Without one, C can send a message to B carrying A's name and B has no way to tell. A signs with `Apriv`; anybody verifies with `Apub`; only A can produce something that `Apub` turns into readable text. A server-assigned `USERID` label is a convenience for the UI, not proof.
 
-> **Dissent, recorded.** Tony disagrees with this on principle — a public-key system whose private keys live on the server is not the shape the math is for. He conceded for team velocity, not because the objection is wrong. Noted here so it does not have to be re-argued, and so the reasoning survives if the demo raises the question.
+> **Prior dissent, resolved.** Tony objected that a public-key system whose private keys live only on the server inverts the point of the math. This revision restores browser-side keys, so the objection no longer applies.
 
 ### Transport
 
@@ -140,24 +138,31 @@ The wire is `VERB:payload` text in both directions, which means the frontend fra
 
 ---
 
-## 5. Wire protocol
+## 5. Wire protocol — changed Aug 21, 13:00
 
-Colon-delimited plain text over WebSocket text frames. This is the format McKay already shipped in a prior project, so it is proven and nobody has to design it.
+**Flat JSON over WebSocket text frames.** One level deep. A `verb` field plus flat fields alongside it. No nesting.
 
 ```
-client → server:   VERB:payload
-server → client:   SERVER:CATEGORY:payload
+client → server:   { "verb": "...", ...fields }
+server → client:   { "verb": "...", ...fields }
 ```
 
-Dispatch on string prefix in the C++ router. One `if` chain. Substring off the verb, parse the rest.
+`nlohmann/json` on the C++ side — already a dependency in `rpg40-server`, so nothing new. `JSON.parse` in the browser, free.
 
-**Do not** introduce REST, JSON schemas, protobuf, or codegen. The problem does not call for them.
+**This replaces the colon-delimited `VERB:payload` scheme.** Two reasons, both real:
+
+1. **Colons are injection hell.** A user types a colon inside their message and the delimiter lies about where the payload starts. That bug exists today, not later.
+2. **`JSON.parse` mangles big numbers.** A 600-digit ciphertext does not survive a JSON number field. So **every number on the wire is a string** — all of them, not just the big ones, so nobody has to hold a mental table of which fields are quoted.
+
+**Consequence: a parse can now fail.** The error verb is no longer deferrable (§9). It is the first thing the hello-world bridge exercises.
+
+**Do not** introduce nesting, JSON Schema, protobuf, or codegen. Flat verb + fields is the whole design.
 
 ### Big integers on the wire — decided
 
 Our payloads are integers with hundreds of digits. **They travel as decimal strings.** Plain digits, no prefix, no padding.
 
-Reason: least code on both ends. Boost `cpp_int` takes a decimal string directly, and the browser's native `BigInt` does too. Hex, binary, and raw bytes all cost a conversion step on at least one side and buy nothing.
+Reason: least code on both ends. Boost `cpp_int` takes a decimal string directly, and the browser's native `BigInt` does too. Hex, binary, and raw bytes all cost a conversion step on at least one side and buy nothing. This is the same rule as above — numbers are quoted — stated for the one field it matters most on.
 
 Three things that came up and are closed:
 
@@ -167,19 +172,89 @@ Three things that came up and are closed:
 
 ---
 
+## 5a. Verb schema — drafted Aug 22, 19:00
+
+> **Status: DRAFT.** Tony redlines, then it goes to McKay. Nothing is implemented against it yet.
+
+Every message uses one envelope. The server's id is the literal string `SERVER`. **Every number is a quoted string** — all of them, so nobody keeps a mental table of which fields are quoted.
+
+```jsonc
+{ "sender": "...", "receiver": "...", "request": "VERB", "content": { } }
+```
+
+`request` carries the verb in **both** directions. One field name, one lookup. `content_sig` appears only where noted below.
+
+### Client → Server
+
+```jsonc
+{ "sender":"tony", "receiver":"SERVER", "request":"JOIN",
+  "content":{ "key_value":"65537", "key_mod":"3233", "key_type":"pub" },
+  "content_sig":"1394" }
+
+{ "sender":"tony", "receiver":"SERVER", "request":"LOOKUP",
+  "content":{ "who":"mckay" } }
+
+{ "sender":"tony", "receiver":"mckay", "request":"SEND",
+  "content":{ "cipher":"2790" },
+  "content_sig":"1301" }
+```
+
+### Server → Client
+
+```jsonc
+{ "sender":"SERVER", "receiver":"tony", "request":"JOIN_SUCC",
+  "content":{ "key_value":"17", "key_mod":"3233", "key_type":"pub" },
+  "content_sig":"..." }
+
+{ "sender":"SERVER", "receiver":"tony", "request":"LOOKUP_SUCC",
+  "content":{ "who":"mckay", "key_value":"7", "key_mod":"3599", "key_type":"pub" } }
+
+{ "sender":"SERVER", "receiver":"tony", "request":"SEND_SUCC",
+  "content":{ "to":"mckay" } }
+
+{ "sender":"tony", "receiver":"mckay", "request":"DELIVER",
+  "content":{ "cipher":"2790" },
+  "content_sig":"1301" }
+```
+
+### Errors
+
+```jsonc
+{ "sender":"SERVER", "receiver":"tony", "request":"ERR_DUPL_JOIN",  "content":{} }
+{ "sender":"SERVER", "receiver":"tony", "request":"ERR_NOT_JOINED", "content":{} }
+{ "sender":"SERVER", "receiver":"tony", "request":"ERR_NO_USER",    "content":{"who":"mckay"} }
+{ "sender":"SERVER", "receiver":"?",    "request":"ERR_BAD_JSON",   "content":{} }
+{ "sender":"SERVER", "receiver":"tony", "request":"ERR_UNSPC",      "content":{} }
+```
+
+`ERR_BAD_JSON` fires when the frame didn't parse, so `sender` cannot be trusted. The session is still open, so it goes back down that socket anyway.
+
+### Three calls that need agreement
+
+- **`key_mod` is split out from `key_value`.** A public key is two numbers. Jamming both into one string means somebody writes a splitter.
+- **`DELIVER` passes `sender` and `content_sig` through untouched.** That is what makes item 3 verifiable end to end.
+- **`SEND` carries `cipher`, never plaintext.** This is §4 restated as schema.
+
+### Still unresolved
+
+`JOIN` is self-certifying: the server verifies `content_sig` using the public key delivered in that same message, so anyone can generate a keypair and sign their own JOIN. It proves nothing at that moment. Left open deliberately — it does not block the bridge.
+
+---
+
 ## 6. Ownership
 
 > **Cortes dropped the class on Aug 19.** Team is three. Nothing was blocked on him; his rows are reassigned or open below.
 
 | Item | Owner | Done when |
 |---|---|---|
-| 1 — website | McKay (Tony polishes) | text in, ciphertext visible, plaintext out |
-| Transport / WebSocket layer | McKay | browser sends a string, C++ prints it, C++ replies, browser shows it |
-| 2 — encrypt/decrypt | Tony | round-trips a message through both keys |
-| 3 — sign/verify | Tony | round-trips in the reverse key order |
+| 1 — website | McKay — **committed through the weekend, Aug 21** (Tony polishes) | text in, ciphertext visible, plaintext out |
+| Transport / WebSocket layer | **Tony, tonight Aug 21** | browser sends a string, C++ prints it, C++ replies, browser shows it |
+| 2 — encrypt/decrypt | Tony | round-trips through both keys, C++ **and** JS |
+| 3 — sign/verify | Tony | round-trips in the reverse key order, C++ **and** JS |
 | 4 — primes, N, T | Bruce | emits a valid keypair on demand, verified by a test |
+| — *Bruce's first task* | Bruce | `get_new_prime` alone. Sent Aug 20. Next function only after this one lands. |
 | 5 — BRIDGES URL | Bruce | returns a working URL for a stored structure |
-| Demo + README | **UNOWNED** | fresh clone, build, run, works |
+| Demo + README | **UNOWNED** — decide by Sun Aug 23 | fresh clone, build, run, works |
 
 **Bruce's surface is one file.** Four functions, all called internally by the server: prime generation, N, T, and the BRIDGES URL. He has limited repo experience, so everything he touches lives in one place and nothing he writes requires editing somebody else's file. Item 4 depends on nothing else, so he can start immediately.
 
@@ -189,17 +264,54 @@ Repo owner holds merge rights. Architecture disputes settle there.
 
 ---
 
-## 7. Eight days, planned backward
+## 6b. Where the code actually is — Aug 22, 17:00
+
+Branch `spauly`, five commits on Aug 20 evening.
+
+```
+svr/RSA-Utility.h   Bruce's surface. gcd + get_new_prime/N/T/E/D/get_visualization_url,
+                    all static, all inline stubs returning 0. Compiles clean.
+svr/RSA-Core.h      class LocksmithBox. Ctor takes (n, key, key_is_priv).
+                    encrypt/decrypt call powm. sign() delegates to encrypt with an
+                    override flag; verify() delegates to decrypt. Structure done.
+cli/                ImportTest.js, modules/RSA.js, bare package.json {"type":"module"}
+```
+
+**Still empty:** `decimal_from_text`, `text_from_decimal`, and every `Utility` body. No transport code exists in the repo at all — no `main`, no Beast, nothing.
+
+**Build system — added Aug 22.** `svr/Makefile`, derived from `particle-raincheck`. Run it from inside `svr/`.
+
+- `make` → builds `./server`
+- `make check` → `-fsyntax-only` over every header. No `main`, no linking, nothing left on disk.
+- `make clean`
+
+**`make check` before every push.** If it says FAIL, it does not compile. This is the gate that did not exist before Aug 22, which is why unbuilt code reached the repo — nobody had a build step to run.
+
+**Bruce's branch, reviewed Aug 22.** Does not compile: five blocking issues, four logic issues. Merge itself is safe — dry-run `spauly` ← `bruce` is clean, zero conflicts. **Nobody rebases.** Bruce opens a PR into `spauly`; Tony merges.
+
+**Gate still open.** Hello-world bridge round-tripping a plain string, plus the two encoding functions. Everything else — BRIDGES, keypair generation, UI polish — waits.
+
+**Message encoding — decided.** Bytes pack into one integer, base 256, positional. `std::string` is already a byte container, so iterate `unsigned char` and never reason about "characters." UTF-8 comes out the other side intact; accented letters, Chinese, and emoji are just two-, three-, and four-byte runs. No library needed, no BOM anywhere — browser textboxes and WebSocket text frames are both BOM-free UTF-8. Formal names, for searching: **OS2IP** for bytes→integer, **blocking** for splitting a long message first.
+
+*Open: chunk size. The constraint that sets it has not been hit yet.*
+
+**Dev keypair, hand-computed and verified:** `P=11, Q=13 → N=143, T=120, E=7, D=103`. Hardcode this until item 4 lands.
+
+**Known bug, demo-grade.** `encrypt` and `decrypt` return `67` / `69` as error codes. Both are legal ciphertexts, so a wrong-key path is indistinguishable from a real message on screen. Needs a different failure channel before the demo.
+
+---
+
+## 7. Six days, planned backward
 
 Blocks are fixed. Work expands to fill whatever it is given, so it gets a wall.
 
 | When | Milestone | Blocks if late |
 |---|---|---|
 | ~~Wed Aug 19~~ | ~~Scope assigned~~ — architecture settled instead; scope list still owed | everything |
-| **Thu Aug 20** | Bruce told his scope. Everyone has cloned `rsa-cha-cha` and pushed once. | everything |
-| **Fri Aug 21** | Hello-world bridge alive: browser string → C++ → browser. No crypto in it. | items 2, 3 |
+| ~~**Thu Aug 20**~~ | ~~Everyone cloned and pushed once~~ — **done.** Bruce pushed `test.cc` on branch `bruce` and has been sent `get_new_prime`. | everything |
+| **Fri Aug 21** | **Hello-world bridge alive: browser string → C++ → browser. No crypto in it. THE priority — everything else waits.** | items 2, 3 |
 | **Fri Aug 21** | Item 4 emits a keypair. | items 2, 3 |
-| **Sun Aug 23** | Item 2 round-trips in a standalone C++ binary, no web layer. | item 3 |
+| **Sun Aug 23** | Item 2 round-trips in a standalone C++ binary. **Go/no-go on the JS port** — not round-tripping by tonight means it gets cut. | item 3 |
 | **Mon Aug 24** | Item 3 round-trips. Website renders the message flow with fake data. | integration |
 | **Tue Aug 25** | Integration: real keys through the real bridge. | — |
 | **Wed Aug 26** | Freeze. Bugfix only. README, demo rehearsal. | — |
@@ -253,7 +365,7 @@ Same architecture, different plumbing. The transport layer is a merge of two pat
 
 ### JS toolchain notes
 
-There is no JS crypto to ship — items 2 and 3 live in C++ only. What remains on the JS side is whatever small helpers the UI needs, as a **plain ES module**: one export per operation, one import line. No build config; Vite runs on Node and already treats `.js` as ESM.
+The JS side now carries a port of items 2 and 3, plus UI helpers. **Plain ES modules** — one export per operation, one import line. No build config; Vite runs on Node and already treats `.js` as ESM. `cli/modules/RSA.js` is the stub that holds this.
 
 - Debug loop is `node file.js`, or bare `node` for a REPL.
 - `BigInt` prints with a trailing `n`. That is the type, not a bug.
@@ -270,7 +382,7 @@ Plain `#include`, one header per unit. **Not** C++20 modules — compiler and CM
 
 Each of these is a spot where two people silently assume different things and lose an evening.
 
-**~~Where keys live.~~ Decided Aug 20** — the server holds keys and runs all crypto. Browsers send and display strings. See §4.
+**~~Where keys live.~~ Revised Aug 20 13:45** — both sides. Browser encrypts and signs for the normal send path; the server holds the directory and can do the math itself. C++ is canonical, JS is a port. See §4.
 
 **~~Server topology.~~ Decided Aug 20** — one C++ server, one session per connection, `userid → session`. See §4.
 
@@ -278,36 +390,8 @@ Each of these is a spot where two people silently assume different things and lo
 
 **One process or two on the C++ side.** Item 4 and item 5 live in one file with four functions (§6), which keeps Bruce out of the server internals. Whether that file compiles into the server binary or runs as a separate tool is still open. *Decide based on how much merging pain we want, not elegance.*
 
-**Errors on the wire.** Malformed message, ciphertext that doesn't parse as a number, wrong key. McKay's pattern answers with `SERVER:ERROR:reason`. Adopt it or invent nothing — but the browser must render *something* when it arrives, or debugging becomes staring at silence. *Decide the error verb on day one; it is the first thing the hello-world bridge should exercise.*
+**~~Errors on the wire.~~ Decided Aug 22** — five error verbs, same envelope as everything else. See §5a.
 
 **Framing drift.** Tony's old protocol was newline-delimited; WebSocket is frame-delimited. One message per frame, no splitting, no combining — say it out loud and write it in the README, because it is exactly the kind of assumption that never gets stated.
 
-**Vercel / Netlify — why not, and it is not a preference.** They force `https://`, which blocks `ws://` as mixed content, which forces a TLS certificate, which forces a domain. That cascade is real — it is why `server.starbornrpg.com` exists. *If someone still wants Vercel, that is fine, but they own getting a cert onto the C++ server.*
-
-**~~Which frontend stack.~~ Decided Aug 20** — McKay's call: **Vite + React + Tailwind.** Vite builds to a folder of static files, which is exactly what the file server hands out, so the Vercel-and-https cascade never starts. *A static host places no limit on what the page does once loaded. Animation, canvas, whatever — all client-side.*
-
-**The demo failure mode.** Rehearse the demo on a machine that did a fresh clone. The classic project-death is code that only runs on the machine it was written on.
-
----
-
-## 10. Open questions
-
-- [x] ~~Which Thursday~~ — Aug 27, confirmed
-- [x] ~~Chat app or literal email form~~ — Kerney: anything with RSA. Chat app, closed Aug 18
-- [x] ~~Big-integer character encoding at the seam~~ — decimal strings, closed Aug 18
-- [x] ~~Where the C++ binary runs during the demo~~ — csci4x, ports 6767 + 6868, tested Aug 18
-- [x] ~~Layout~~ — one browser tab per machine, closed Aug 18
-- [x] ~~Where the crypto runs~~ — server-side C++, plaintext on the initial send, closed Aug 20
-- [ ] Whether signature output must be human-readable or can stay raw
-- [ ] What structure BRIDGES visualizes, and how long it is retained
-- [ ] Whether the BRIDGES button belongs to item 1 or item 5
-- [ ] Who owns demo + README
-- [ ] JS export names for any UI-side helpers, written before implementation
-
----
-
-## 11. AI policy
-
-Kerney announced in class that AI is allowed on **any CS project.** Vibe coding is explicitly fair game. This overrides the syllabus line for project scope only — daily homework and Competency Exams are unchanged.
-
-One team rule on top of that: whoever owns an item must be able to explain it out loud without the file open. The Modular Math CE includes an RSA decryption done by hand, on paper. Code you cannot explain is a liability twice.
+**Vercel / Netlify — why not, and it is not a preference.** They force `https://`, which blocks `ws://` as mixed content, which forces a TLS cer
