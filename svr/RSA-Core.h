@@ -35,9 +35,9 @@ inline Message LocksmithBox::decimal_from_text(const string& text) const {
     // text -> one big integer
     const Message msg = 0;
 
-    const char* byteStringPtr = text.data(); // char[], it holds wack-ass cahrs like ëéè as one char.... perchance :)))
+//    const char* byteStringPtr = text.data(); // char[], it holds wack-ass cahrs like ëéè as one char.... perchance :)))
 
-    for (char* t = byteStringPtr; *t != '\0'; t++) {}
+  //  for (char* t = byteStringPtr; *t != '\0'; t++) {}
 
     return msg;
 }
