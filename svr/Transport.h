@@ -40,13 +40,7 @@ inline json envelope(const std::string& from,
 class Hub;
 
 // ---------------------------------------------------------------- Session
-//
-// One per open browser tab. Lives as a shared_ptr; every async callback
-// captures shared_from_this(), so the object survives exactly as long as
-// there is an operation in flight. When the socket closes and the last
-// callback returns, the refcount hits zero and it frees itself. Hub holds
-// weak_ptr only, so a dead session leaves a stale handle that expires on
-// its own -- nobody sweeps the map.
+// One per open browser tab. Lives as a shared_ptr so wll auto deallocate once it dies
 
 class Session : public std::enable_shared_from_this<Session> {
    public:
@@ -74,8 +68,7 @@ class Session : public std::enable_shared_from_this<Session> {
     std::string userid_;
 };
 
-// ---------------------------------------------------------------- Hub
-//
+
 // The public-key directory and the router. userid -> (session, public key).
 
 class Hub {
@@ -100,11 +93,13 @@ class Hub {
     }
 
     void route(const std::shared_ptr<Session>& from, const std::string& frame);
+    void leave(const std::string& who, const Session* session);
 
    private:
     void do_join(const std::shared_ptr<Session>&, const json&);
     void do_lookup(const std::shared_ptr<Session>&, const json&);
     void do_send(const std::shared_ptr<Session>&, const json&);
+    void announce_members();
 
     std::map<std::string, Entry> dir_;
 };
@@ -136,6 +131,7 @@ inline void Session::on_read(bb::error_code ec, std::size_t) {
         // Normal tab close lands here. Session dies when this returns.
         if (ec != wsock::error::closed)
             std::cerr << "read [" << userid_ << "]: " << ec.message() << "\n";
+        if (joined()) hub_.leave(userid_, this);
         return;
     }
 
@@ -221,6 +217,36 @@ inline void Hub::do_join(const std::shared_ptr<Session>& from, const json& msg) 
                         json{{"key_value", e.key_value},
                              {"key_mod", e.key_mod},
                              {"key_type", e.key_type}}));
+    announce_members();
+}
+
+inline void Hub::leave(const std::string& who, const Session* session) {
+    auto it = dir_.find(who);
+    if (it == dir_.end()) return;
+
+    auto registered = it->second.session.lock();
+    if (registered && registered.get() != session) return;
+
+    dir_.erase(it);
+    std::cout << "   leave: " << who << "\n";
+    announce_members();
+}
+
+inline void Hub::announce_members() {
+    json users = json::array();
+    for (auto it = dir_.begin(); it != dir_.end();) {
+        if (auto session = it->second.session.lock()) {
+            users.push_back(it->first);
+            ++it;
+        } else {
+            it = dir_.erase(it);
+        }
+    }
+
+    const json message = envelope("SERVER", "ROOM", "MEMBERS", json{{"users", users}});
+    for (const auto& [name, entry] : dir_) {
+        if (auto session = entry.session.lock()) session->send(message);
+    }
 }
 
 inline void Hub::do_lookup(const std::shared_ptr<Session>& from, const json& msg) {
