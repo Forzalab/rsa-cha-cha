@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { Activity, ArrowDown, Eye, EyeOff, Fingerprint, ImagePlus, LockKeyhole, Radio, Send, ShieldCheck, Smile, SmilePlus, Users } from 'lucide-react'
 import { JoinModal } from './components/JoinModal.jsx'
 import { RsaMatrixBackground } from './components/RsaMatrixBackground.jsx'
 import { useChatSocket } from './hooks/useChatSocket.js'
 import { parseStickerMessage, STICKERS, stickerShortcode } from './lib/stickers.js'
 import { EMOJIS } from './lib/emojis.js'
+import { isKerney, joinSlug } from './lib/joinSlugs.js'
 import { CipherReveal } from './components/CipherReveal.jsx'
 import { PropagandaFrame } from './components/PropagandaFrame.jsx'
 
@@ -15,6 +16,23 @@ function StickerImage({ sticker, compact = false }) {
   const [failed, setFailed] = useState(false)
   if (failed) return <div className={`${compact ? 'h-24' : 'h-44'} grid w-full place-items-center rounded-xl border border-dashed border-white/10 bg-white/[.025] px-3 text-center text-xs text-[#f4e4c1]/45`}>{sticker.label}<br />asset needed</div>
   return <img src={sticker.src} alt={sticker.label} onError={() => setFailed(true)} className={`${compact ? 'h-24' : 'max-h-72'} w-full rounded-xl object-cover`} />
+}
+
+function JoinSlug({ notice }) {
+  const tone = notice.kind === 'kerney'
+    ? 'border-[#ffd100] bg-[#ffd100]/15 text-[#ffe873]'
+    : notice.kind === 'rosas'
+      ? 'border-[#ff2d78] bg-[#5c0030]/60 text-[#ffd6e6]'
+      : 'border-[#ffd100]/35 bg-[#ffd100]/[.06] text-[#ffd100]/85'
+  return (
+    <div className="join-slug my-3 flex items-center gap-3 px-2">
+      <span className="h-px flex-1 bg-gradient-to-r from-transparent to-[#ffd100]/45" />
+      <span className={`han shrink-0 rounded-full border px-3 py-1 text-[11px] leading-4 ${tone} ${notice.kind === 'kerney' ? 'slug-jackpot' : ''}`}>
+        {notice.text}
+      </span>
+      <span className="h-px flex-1 bg-gradient-to-l from-transparent to-[#ffd100]/45" />
+    </div>
+  )
 }
 
 export default function App() {
@@ -42,6 +60,47 @@ export default function App() {
     }
     return null
   })()
+
+  // MEMBERS arrives as a full roster, so a join is a set difference. The very
+  // first roster is the room as it already was — announcing it would be noise.
+  const [notices, setNotices] = useState([])
+  const [freshMembers, setFreshMembers] = useState([])
+  const [frameFlash, setFrameFlash] = useState(false)
+  const seenMembersRef = useRef(null)
+
+  useEffect(() => {
+    const previous = seenMembersRef.current
+    seenMembersRef.current = chat.members
+    if (previous === null) return
+
+    const arrivals = chat.members.filter((member) => !previous.includes(member))
+    if (!arrivals.length) return
+
+    const anchor = chat.messages.length
+    setNotices((current) => [
+      ...current,
+      ...arrivals.map((name) => {
+        const slug = joinSlug(name)
+        return { id: `join:${name}:${anchor}:${current.length}`, anchor, name, ...slug }
+      }),
+    ])
+
+    // The joiner does not get the fanfare about themselves — only the slug.
+    const others = arrivals.filter((name) => name !== chat.username)
+    if (!others.length) return
+
+    setFreshMembers((current) => [...current, ...others])
+    window.setTimeout(() => {
+      setFreshMembers((current) => current.filter((name) => !others.includes(name)))
+    }, 1900)
+
+    if (others.some(isKerney)) {
+      setFrameFlash(true)
+      window.setTimeout(() => setFrameFlash(false), 1600)
+    }
+  }, [chat.members])
+
+  const noticesAt = (index) => notices.filter((notice) => notice.anchor === index)
 
   const draftLength = [...draft].length
   const charactersOver = Math.max(0, draftLength - MAX_MESSAGE_LENGTH)
@@ -115,21 +174,21 @@ export default function App() {
     <main onClick={() => { setOpenReactions(null); setStickerPickerOpen(false); setEmojiPickerOpen(false) }} className="aurora grid-glow relative min-h-screen overflow-hidden app-main">
       <RsaMatrixBackground />
       <div className="scanlines pointer-events-none fixed inset-0 z-40 opacity-20" />
-      <PropagandaFrame />                                {/* ← add this line */}
+      <PropagandaFrame flash={frameFlash} />
       {!entryComplete && <JoinModal connectionStatus={chat.status} serverError={chat.error} onJoin={chat.join} onClearError={chat.clearError} onComplete={completeEntry} />}
 <div className="pointer-events-none absolute inset-x-24 top-0 h-px bg-gradient-to-r from-transparent via-yellow-400 to-transparent" />
       <section className="chat-shell chat-shell-fit relative z-10 mx-auto flex max-w-6xl overflow-hidden rounded-[1.75rem] border border-slate-300/10 shadow-[0_30px_100px_rgba(0,0,0,.55)] backdrop-blur-xl">
         <div className="pointer-events-none absolute inset-x-24 top-0 h-px bg-gradient-to-r from-transparent via-red-400/60 to-transparent" />
-        <aside className="chat-sidebar hidden w-64 shrink-0 border-r border-slate-300/8 p-5 md:flex md:flex-col">
-          <div className="flex items-center gap-3 text-white"><span className="relative grid h-9 w-9 place-items-center rounded-xl border border-red-400/20 bg-red-500/10"><Fingerprint className="text-[#ffe873]" size={20} /><span className="status-pulse absolute inset-0 rounded-xl border border-red-400/30" /></span><div><span className="block font-semibold tracking-tight">RSA Cha-Cha</span><span className="block text-[10px] uppercase tracking-[.2em] text-[#f4e4c1]/45">Secure channel</span></div></div>
-          <div className="mt-10 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#f4e4c1]/55"><Users size={14} /> In the room</div>
+        <aside className="chat-sidebar hidden w-64 shrink-0 p-5 md:flex md:flex-col">
+          <div className="flex items-center gap-3 text-white"><span className="relative grid h-9 w-9 place-items-center rounded-xl border border-red-400/20 bg-red-500/10"><Fingerprint className="text-[#ffe873]" size={20} /><span className="status-pulse absolute inset-0 rounded-xl border border-red-400/30" /></span><div><span className="block font-semibold tracking-tight">RSA Cha-Cha</span><span className="block text-[10px] uppercase tracking-[.2em] text-[#ffd100]/70">Secure channel</span></div></div>
+          <div className="mt-10 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#ffd100]"><Users size={14} /> In the room</div>
           <div className="mt-4 space-y-2">
-            <div className="flex items-center gap-3 rounded-xl border border-yellow-400/10 bg-yellow-400/[.035] px-2 py-2 text-sm text-[#f4e4c1]/90">
-              <span className="h-2 w-2 rounded-full bg-yellow-400 shadow-[0_0_9px_#67e8f9]" />kerney
+            <div className="flex items-center gap-3 rounded-xl border border-[#ffd100]/45 bg-[#ffd100]/12 px-2 py-2 text-sm font-semibold text-[#ffe873]">
+              <span className="h-2 w-2 shrink-0 rounded-full bg-[#ffe873] shadow-[0_0_10px_rgba(255,232,115,1)]" />kerney
             </div>
             {(chat.members.length ? chat.members : chat.username ? [chat.username] : []).map((member) => (
-              <div key={`member:${member}`} className="group flex items-center gap-3 rounded-xl border border-transparent px-2 py-2 text-sm text-[#f4e4c1]/85transition hover:border-white/5 hover:bg-white/[.025]">
-                <span className="h-2 w-2 rounded-full bg-red-500 shadow-[0_0_9px_#34d399]" />{member}{member === chat.username && <span className="text-[#f4e4c1]/45">you</span>}
+              <div key={`member:${member}`} className={`group flex items-center gap-3 rounded-xl border border-transparent px-2 py-2 text-sm text-[#fff6dc] transition hover:border-[#ffd100]/35 hover:bg-[#ffd100]/10 ${freshMembers.includes(member) ? 'member-pop' : ''}`}>
+                <span className="h-2 w-2 shrink-0 rounded-full bg-[#ffd100] shadow-[0_0_9px_rgba(255,209,0,.9)]" />{member}{member === chat.username && <span className="text-[#ffd100]/70">you</span>}
               </div>
             ))}
           </div>
@@ -142,7 +201,11 @@ export default function App() {
 
         <div className="chat-pane relative flex min-w-0 flex-1 flex-col">
           <header className="chat-header flex h-20 items-center justify-between border-b border-slate-300/8 px-5 sm:px-7">
-               <div className="flex items-center gap-3"><h2 className="font-semibold tracking-tight text-[#ffd100]">加密房间 · Encrypted Room</h2></div>
+               <div className="banner-plaque flex shrink-0 items-center gap-2 border-2 border-[#ffd100] bg-[#4a0410] px-3 py-1.5">
+                <h2 className="han text-[13px] leading-4 text-[#ffd100]">热烈庆祝本信道盛大开通</h2>
+                <span className="text-[#ffd100]/60">·</span>
+                <span className="text-[13px] font-bold leading-4 text-[#fff6dc]">Now with RSA!</span>
+              </div>
             <button
               type="button"
               onClick={(event) => { event.stopPropagation(); setAllCipher((on) => !on); setCiphered(new Set()); setOpenReactions(null); flashBlocked('ALL') }}
@@ -150,7 +213,7 @@ export default function App() {
               aria-label={allCipher ? 'Show plaintext' : 'Show ciphertext'}
               className={`cipher-switch group/switch flex shrink-0 items-center gap-2 rounded-full border-2 px-3 py-1.5 text-xs font-bold transition active:translate-y-px ${allCipher
                 ? 'border-[#4a0410] bg-[#ffd100] text-[#4a0410] shadow-[0_3px_0_#4a0410] hover:shadow-[0_5px_0_#4a0410] hover:-translate-y-0.5'
-                : 'border-[#ffd100] bg-[#4a0410] text-[#ffe873] shadow-[0_3px_0_#8a0a1c] hover:shadow-[0_5px_0_#8a0a1c] hover:-translate-y-0.5'}`}
+                : 'border-[#ffd100] bg-[#26040a] text-[#ffd100] shadow-[0_3px_0_#8a0a1c] hover:bg-[#ffd100] hover:text-[#26040a] hover:shadow-[0_5px_0_#8a0a1c] hover:-translate-y-0.5'}`}
             >
               {allCipher ? <EyeOff size={14} /> : <Eye size={14} />}
               <span className={`switch-label ${labelEnglish ? '' : 'han'}`} key={`${allCipher}-${labelEnglish}`}>
@@ -167,6 +230,7 @@ export default function App() {
             <div className="m-auto max-w-sm text-center"><LockKeyhole className="mx-auto text-[#ffd100]/40" size={38} /><h3 className="mt-4 font-medium text-[#f4e4c1]/85">房间安静 · The room is quiet</h3></div>
             )}
             {chat.messages.map((message, i) => {
+              const leading = noticesAt(i)
               const own = message.sender === chat.username
               const prev = chat.messages[i - 1]
               const next = chat.messages[i + 1]
@@ -187,7 +251,9 @@ export default function App() {
               const showCipher = Boolean(message.cipher) && !revealing
                 && ((allCipher !== ciphered.has(message.id)) || hoveredCipher === message.id)
               return (
-                <article key={message.id}
+                <Fragment key={message.id}>
+                {leading.map((notice) => <JoinSlug key={notice.id} notice={notice} />)}
+                <article
   className={`group/message w-fit max-w-[min(84%,30rem)] sm:max-w-[min(70%,38rem)] ${firstOfGroup ? 'mt-2.5 first:mt-0' : ''} ${own ? 'message-enter-right ml-auto' : 'message-enter-left mr-auto'}`}>
                 {firstOfGroup && (
                   <p className={`mb-1 flex items-center gap-1.5 text-xs font-bold text-[#ffd100]/85 ${own ? 'justify-end text-right' : ''}`}>
@@ -208,12 +274,12 @@ export default function App() {
   onKeyDown={(event) => { if (event.key !== 'Enter' && event.key !== ' ') return; event.preventDefault(); if (cipherLocked) { flashBlocked(message.id); return } flipCipher(message.id) }}
   className={`bubble-arrive max-w-full whitespace-pre-wrap break-words [overflow-wrap:anywhere] border px-4 py-3 text-sm leading-6 shadow-lg select-none ${cipherLocked ? 'cursor-default' : 'cursor-pointer'} ${blocked ? 'cipher-blocked' : ''}
   ${own
-    ? `border-[#ffd100]/40 bg-gradient-to-br from-[#e01b33] to-[#8a0a1c] text-[#fff6dc] shadow-black/50
+    ? `border-[#ff6b7f]/30 bg-[#c8102e] text-white shadow-black/40
        rounded-l-2xl ${firstOfGroup ? 'rounded-tr-2xl' : 'rounded-tr-md'} ${lastOfGroup ? 'rounded-br-md' : 'rounded-br-md'}`
     : message.isAi
-      ? `border-[#ffd100]/60 bg-[#26040a]/92 text-[#fff6dc] shadow-black/50 backdrop-blur-md
+      ? `border-[#ffd100]/55 bg-[#2e0912] text-[#fff6dc] shadow-black/40
          rounded-r-2xl ${firstOfGroup ? 'rounded-tl-2xl' : 'rounded-tl-md'} rounded-bl-md`
-      : `border-[#ffd100]/35 bg-[#26040a]/92 text-[#fff6dc] shadow-black/50 backdrop-blur-md
+      : `border-[#ffd100]/22 bg-[#2e0912] text-[#fff6dc] shadow-black/40
          rounded-r-2xl ${firstOfGroup ? 'rounded-tl-2xl' : 'rounded-tl-md'} rounded-bl-md`}`}>{showCipher
   ? <span className="cipher-text block break-all font-mono text-[11px] leading-4">{message.cipher}</span>
   : revealing
@@ -244,8 +310,12 @@ export default function App() {
                     )}
                   </div>
                 </article>
+                </Fragment>
               )
             })}
+            {notices.filter((notice) => notice.anchor >= chat.messages.length).map((notice) => (
+              <JoinSlug key={notice.id} notice={notice} />
+            ))}
             {chat.kerneyThinking && <div className="message-enter-left mt-4 w-fit max-w-[70%]"><p className="mb-1 text-xs font-bold text-[#ffd100]/85">kerney</p><div className="flex w-fit items-center gap-[5px] rounded-full border border-[#ffd100]/45 bg-[#26040a]/92 px-3.5 py-2.5 shadow-lg shadow-black/50"><span className="typing-dot h-[7px] w-[7px] rounded-full bg-[#ffd100]" /><span className="typing-dot h-[7px] w-[7px] rounded-full bg-[#ffd100]" /><span className="typing-dot h-[7px] w-[7px] rounded-full bg-[#ffd100]" /></div></div>}
           </div>
 
