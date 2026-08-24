@@ -22,8 +22,11 @@ export function JoinModal({ connectionStatus, serverError, onJoin, onClearError,
 
   useEffect(() => {
     if (phase === 'loading') {
-      const timers = SECURITY_CHECKS.map((_, index) => window.setTimeout(() => setChecksVisible(index + 1), 430 * (index + 1)))
-      timers.push(window.setTimeout(() => setPhase('granted'), 430 * (SECURITY_CHECKS.length + 1)))
+      const timers = SECURITY_CHECKS.map((_, index) =>
+        window.setTimeout(() => setChecksVisible(index + 1), 495 * (index + 1)),
+      )
+      // one timer, not two — the old 430ms copy fired early and raced the 495ms one
+      timers.push(window.setTimeout(() => setPhase('granted'), 495 * (SECURITY_CHECKS.length + 1)))
       return () => timers.forEach(window.clearTimeout)
     }
     if (phase === 'granted') {
@@ -53,37 +56,81 @@ export function JoinModal({ connectionStatus, serverError, onJoin, onClearError,
     finally { setSubmitting(false) }
   }
 
+  // sunburst behind the poster — pure CSS, no asset
+  const rays = (
+    <div
+      className="pointer-events-none absolute left-1/2 top-1/2 h-[46rem] w-[46rem] -translate-x-1/2 -translate-y-1/2 opacity-40"
+      style={{
+        background:
+          'repeating-conic-gradient(from 0deg at 50% 50%, rgba(255,209,0,.22) 0deg 4deg, transparent 4deg 12deg)',
+        maskImage: 'radial-gradient(circle, black 20%, transparent 68%)',
+        WebkitMaskImage: 'radial-gradient(circle, black 20%, transparent 68%)',
+        animation: 'prop-star-spin 60s linear infinite',
+      }}
+    />
+  )
+
   if (phase !== 'form') return (
-    <div className={`fixed inset-0 z-50 grid place-items-center overflow-hidden bg-[#0b090d]/90 px-5 backdrop-blur-xl ${phase === 'exit' ? 'modal-exit' : ''}`}>
-      <div className="pointer-events-none absolute h-80 w-80 rounded-full bg-amber-400/10 blur-3xl" />
-      <div className="relative w-full max-w-lg overflow-hidden rounded-3xl border border-amber-300/15 bg-[#18141b]/95 p-7 shadow-2xl shadow-black/60">
-        <div className="absolute inset-x-12 top-0 h-px bg-gradient-to-r from-transparent via-amber-300 to-transparent" />
-        <div className="flex items-center justify-between border-b border-white/8 pb-5">
-          <div><p className="text-[10px] font-semibold uppercase tracking-[.22em] text-amber-300">Identity clearance</p><h2 className="mt-1 text-xl font-semibold text-white">Establishing secure vibes</h2></div>
-          <div className="relative grid h-11 w-11 place-items-center rounded-full border border-amber-300/15 text-amber-300"><RadioTower size={19} /><span className="loading-orbit absolute inset-[-4px] rounded-full border border-transparent border-t-amber-300/70" /></div>
+    <div className={`fixed inset-0 z-50 grid place-items-center overflow-hidden bg-[#4a0410]/92 px-12 py-12 ${phase === 'exit' ? 'modal-exit' : ''}`}>
+      {rays}
+      <div className="relative w-full max-w-lg -rotate-[.15deg] border-[3px] border-[#ffd100] bg-[#7d0a19] p-7 shadow-[14px_14px_0_rgba(0,0,0,.55)]">
+        <div className="flex items-center justify-between border-b-2 border-[#ffd100]/50 pb-4">
+          <div>
+            <p className="han text-[11px] text-[#ffd100]">身份审查中</p>
+            <h2 className="mt-1 text-xl font-bold text-[#f4e4c1]">Establishing secure vibes</h2>
+          </div>
+          <div className="relative grid h-11 w-11 place-items-center border-2 border-[#ffd100] text-[#ffd100]">
+            <RadioTower size={19} />
+            <span className="loading-orbit absolute inset-[-5px] rounded-full border border-transparent border-t-[#ffd100]" />
+          </div>
         </div>
+
         <div className="min-h-64 space-y-3 py-6 font-mono text-sm">
-          {SECURITY_CHECKS.slice(0, checksVisible).map((check, index) => <div key={check} className="loading-line flex items-center gap-3 text-slate-400"><Check size={14} className={index === checksVisible - 1 && phase === 'loading' ? 'text-amber-300' : 'text-amber-400'} /><span>{check}</span><span className="ml-auto text-[10px] text-slate-700">OK</span></div>)}
-          {phase === 'granted' || phase === 'exit' ? <div className="loading-line mt-6 rounded-xl border border-amber-300/20 bg-amber-400/8 px-4 py-3 text-center font-sans text-sm font-semibold tracking-wide text-amber-300">CLEARANCE GRANTED (probably)</div> : <span className="inline-block h-4 w-2 animate-pulse bg-amber-300/70" />}
+          {SECURITY_CHECKS.slice(0, checksVisible).map((check, index) => (
+            <div key={check} className="loading-line flex items-center gap-3 text-[#f4e4c1]/75">
+              <Check size={14} className={index === checksVisible - 1 && phase === 'loading' ? 'text-[#ffe873]' : 'text-[#ffd100]'} />
+              <span>{check}</span>
+              <span className="han ml-auto text-[10px] text-[#ffd100]/70">合格</span>
+            </div>
+          ))}
+          {phase === 'granted' || phase === 'exit' ? (
+            <div className="stamp-in mt-6 border-4 border-[#ffd100] bg-[#ffd100]/10 px-4 py-3 text-center">
+              <span className="han block text-lg text-[#ffe873]">批准通行</span>
+              <span className="block text-sm font-bold text-[#f4e4c1]">CLEARANCE GRANTED (probably)</span>
+            </div>
+          ) : (
+            <span className="inline-block h-4 w-2 animate-pulse bg-[#ffd100]" />
+          )}
         </div>
-        <div className="h-1 overflow-hidden rounded-full bg-white/5"><div className="h-full bg-gradient-to-r from-amber-400 to-cyan-300 transition-all duration-500" style={{ width: `${phase === 'granted' || phase === 'exit' ? 100 : Math.round((checksVisible / SECURITY_CHECKS.length) * 92)}%` }} /></div>
+
+        <div className="h-2 overflow-hidden border-2 border-[#ffd100]/60 bg-black/30">
+          <div
+            className="h-full bg-[#ffd100] transition-all duration-500"
+            style={{ width: `${phase === 'granted' || phase === 'exit' ? 100 : Math.round((checksVisible / SECURITY_CHECKS.length) * 92)}%` }}
+          />
+        </div>
       </div>
     </div>
   )
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center overflow-hidden bg-[#0b090d]/80 px-5 backdrop-blur-xl">
-      <div className="pointer-events-none absolute left-1/2 top-1/2 h-72 w-72 -translate-x-1/2 -translate-y-1/2 rounded-full bg-amber-400/10 blur-3xl" />
-      <form onSubmit={submit} className="modal-enter relative w-full max-w-md overflow-hidden rounded-3xl border border-amber-100/10 bg-[#1b171e]/95 p-7 shadow-2xl shadow-amber-950/40">
-        <div className="absolute inset-x-16 top-0 h-px bg-gradient-to-r from-transparent via-amber-300/80 to-transparent" />
-        <div className="float-slow mb-6 flex h-12 w-12 items-center justify-center rounded-2xl border border-amber-300/20 bg-amber-400/10 text-amber-300 shadow-lg shadow-amber-500/10">
-          <KeyRound size={23} strokeWidth={1.8} />
-        </div>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-[.22em] text-amber-300">RSA Cha-Cha</p>
-        <h1 className="text-3xl font-semibold tracking-tight text-white">Join the room</h1>
-        <p className="mt-3 leading-6 text-slate-400">Choose a display name for this session. No account or password needed.</p>
+    <div className="fixed inset-0 z-50 grid place-items-center overflow-hidden bg-[#4a0410]/88 px-12 py-12">
+      {rays}
+      <form onSubmit={submit} className="modal-enter relative w-full max-w-md border-[3px] border-[#ffd100] bg-[#7d0a19] p-7 shadow-[14px_14px_0_rgba(0,0,0,.55)]">
+        <div className="absolute -top-4 left-6 prop-plate text-xs">第 6868 号信道</div>
 
-        <label className="mt-7 block text-sm font-medium text-slate-200" htmlFor="username">Display name</label>
+        <div className="float-slow mb-5 mt-2 grid h-12 w-12 place-items-center border-2 border-[#ffd100] bg-[#ffd100]/10 text-[#ffd100]">
+          <KeyRound size={23} strokeWidth={2.2} />
+        </div>
+
+        <p className="han text-[13px] text-[#ffd100]">人民加密通信频道</p>
+        <h1 className="mt-1 text-4xl font-bold leading-tight text-[#f4e4c1]" style={{ textShadow: '3px 3px 0 #4a0410' }}>
+          RSA CHA-CHA
+        </h1>
+        <p className="mt-2 text-lg font-bold text-[#ffe873]">Join the room</p>
+        <div className="mt-4 h-1 bg-[#ffd100]" />
+
+        <label className="han mt-6 block text-xs text-[#ffd100]" htmlFor="username">姓名 / DISPLAY NAME</label>
         <input
           id="username"
           autoFocus
@@ -91,14 +138,24 @@ export function JoinModal({ connectionStatus, serverError, onJoin, onClearError,
           value={name}
           onChange={(event) => { setName(event.target.value); setLocalError('') }}
           placeholder="mckay"
-          className="mt-2 w-full rounded-xl border border-white/10 bg-black/25 px-4 py-3 text-white outline-none transition placeholder:text-slate-600 focus:border-amber-400/60 focus:ring-4 focus:ring-amber-400/10"
+          className="mt-2 w-full border-2 border-[#ffd100]/70 bg-[#4a0410] px-4 py-3 text-[#f4e4c1] outline-none transition placeholder:text-[#f4e4c1]/35 focus:border-[#ffd100] focus:bg-[#3a030c]"
         />
-        {(localError || serverError) && <p className="mt-2 text-sm text-rose-400">{localError || serverError}</p>}
+        {(localError || serverError) && <p className="mt-2 text-sm font-bold text-[#ffe873]">{localError || serverError}</p>}
 
-        <button disabled={busy || connectionStatus === 'disconnected'} className="group mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-400 to-orange-300 px-4 py-3 font-semibold text-amber-950 shadow-lg shadow-amber-500/15 transition duration-300 hover:-translate-y-0.5 hover:shadow-amber-400/25 active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50">
+        <button
+          disabled={busy || connectionStatus === 'disconnected'}
+          className="group mt-6 flex w-full items-center justify-center gap-2 border-2 border-[#4a0410] bg-[#ffd100] px-4 py-3 text-lg font-bold text-[#4a0410] shadow-[5px_5px_0_rgba(0,0,0,.5)] transition duration-150 hover:-translate-y-0.5 hover:shadow-[7px_7px_0_rgba(0,0,0,.5)] active:translate-y-0.5 active:shadow-[2px_2px_0_rgba(0,0,0,.5)] disabled:cursor-not-allowed disabled:opacity-50"
+        >
           {busy && <LoaderCircle className="animate-spin" size={18} />}
-          {connectionStatus === 'connecting' ? 'Connecting…' : submitting ? 'Joining…' : connectionStatus === 'disconnected' ? 'Server offline' : 'Join chat'}
+          {connectionStatus === 'connecting' ? 'Connecting…'
+            : submitting ? 'Joining…'
+            : connectionStatus === 'disconnected' ? 'Server offline'
+            : 'Join chat'}
         </button>
+
+        <p className="han mt-4 text-center text-[10px] leading-4 text-[#ffd100]/65">
+          明文可耻 · 密文光荣 · 本频道全程录音录像
+        </p>
       </form>
     </div>
   )

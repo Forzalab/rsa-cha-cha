@@ -1,44 +1,242 @@
 @import "tailwindcss";
 
+/* Fonts are loaded by <link> in index.html. Do not add @import here — Tailwind
+   inlines itself above and any later @import gets dropped by the browser. */
+
 @theme {
-  --font-sans: "Chakra Petch", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Comic Neue", "Comic Sans MS", "Chalkboard SE", cursive;
   --font-mono: "Space Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
+  --font-han: "Noto Sans SC", "Microsoft YaHei", "PingFang SC", sans-serif;
 }
 
 :root {
-  color: #e8edf6;
-  background: #0b0a0f;
-  font-family: "Chakra Petch", ui-sans-serif, system-ui, sans-serif;
+  /* poster stock */
+  --red-banner: #c8102e;
+  --red-deep: #7d0a19;
+  --red-ink: #4a0410;
+  --gold: #ffd100;
+  --gold-hot: #ffe873;
+  --cream: #f4e4c1;
+  --paper: #5c0a14;
+
+  --accent: var(--red-banner);
+  --accent-soft: #ff4d4d;
+
+  /* strip thickness — ONE source of truth. Drives the four banners, the main
+     padding, and the chat shell height. Change here, nowhere else. */
+  --edge: 34px;
+  --edge-gap: 12px;
+
+  color: var(--cream);
+  background: var(--paper);
+  font-family: var(--font-sans);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
 
 * { box-sizing: border-box; }
-body { margin: 0; min-width: 320px; min-height: 100vh; }
-button, input, textarea { font: inherit; }
-button {
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  font-family: var(--font-sans);
+  background-color: var(--paper);
+  /* rays out of the top, gold star tile, deep red floor. Busy on purpose. */
+  background-image:
+    repeating-conic-gradient(from 0deg at 50% -10%,
+      rgba(255, 209, 0, .10) 0deg 3deg, transparent 3deg 9deg),
+    radial-gradient(circle at 50% -12%, #d41f36 0%, #8d0d1e 46%, #4a0410 100%);
+  background-attachment: fixed;
 }
 
-button:disabled {
-  cursor: not-allowed;
+button, input, textarea { font: inherit; font-family: var(--font-sans); }
+button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+button:disabled { cursor: not-allowed; }
+summary, [role="button"] { cursor: pointer; }
+
+::selection { color: var(--red-ink); background: var(--gold); }
+* { scrollbar-width: thin; scrollbar-color: rgba(255, 209, 0, .45) transparent; }
+
+/* machine output stays machine-looking */
+.cipher-text, .font-mono { font-family: var(--font-mono); }
+
+/* Chinese always sets in the heavy banner face, never the clown face */
+.han { font-family: var(--font-han); font-weight: 900; letter-spacing: .08em; }
+
+/* ─────────────────────────────────────────────
+   PROPAGANDA FRAME — the four scrolling edges
+   ───────────────────────────────────────────── */
+
+.prop-frame {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
 }
 
-summary,
-[role="button"] {
-  cursor: pointer;
+.prop-strip {
+  position: fixed;
+  background: linear-gradient(180deg, #e01b33, #a30f22 55%, #7d0a19);
+  color: var(--gold-hot);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  box-shadow: 0 0 0 2px var(--gold) inset, 0 0 24px rgba(0, 0, 0, .55);
+  text-shadow: 0 2px 0 rgba(0, 0, 0, .55);
+  font-family: var(--font-han);
+  font-weight: 900;
+  font-size: 15px;
+  letter-spacing: .16em;
+  white-space: nowrap;
 }
 
-::selection { color: #451a03; background: #fcd34d; }
-* { scrollbar-width: thin; scrollbar-color: rgba(245, 158, 11, .28) transparent; }
+.prop-strip--top    { top: 0;    left: 0; right: 0;  height: var(--edge); }
+.prop-strip--bottom { bottom: 0; left: 0; right: 0;  height: var(--edge); }
+.prop-strip--left   { left: 0;   top: 0;  bottom: 0; width: var(--edge); }
+.prop-strip--right  { right: 0;  top: 0;  bottom: 0; width: var(--edge); }
+
+/* main reserves exactly the strip space; shell height is derived from the same
+   variable so the two can never drift apart again. 100dvh, not 100vh —
+   mobile Firefox counts the URL-bar area in vh and the composer falls off. */
+.app-main { padding: calc(var(--edge) + var(--edge-gap)); }
+.chat-shell-fit { height: calc(100dvh - (var(--edge) + var(--edge-gap)) * 2); }
+
+.prop-strip--left, .prop-strip--right {
+  background: linear-gradient(90deg, #e01b33, #a30f22 55%, #7d0a19);
+  flex-direction: column;
+  justify-content: flex-start;
+}
+/* vertical text lives on the item, not the strip — keeps flex axes normal */
+.prop-strip--left  .prop-item { writing-mode: vertical-lr; }
+.prop-strip--right .prop-item { writing-mode: vertical-rl; }
+
+.prop-track {
+  display: inline-flex;
+  flex: none;
+  gap: 3.5rem;
+  padding-inline: 1.75rem;
+  will-change: transform;
+}
+.prop-strip--top .prop-track    { animation: prop-slide-left 34s linear infinite; }
+.prop-strip--bottom .prop-track { animation: prop-slide-right 41s linear infinite; }
+
+.prop-strip--left .prop-track,
+.prop-strip--right .prop-track {
+  flex-direction: column;
+  padding-block: 1.75rem;
+  padding-inline: 0;
+}
+.prop-strip--left .prop-track  { animation: prop-slide-up 47s linear infinite; }
+.prop-strip--right .prop-track { animation: prop-slide-down 53s linear infinite; }
+
+@keyframes prop-slide-left  { from { transform: translateX(0); }     to { transform: translateX(-50%); } }
+@keyframes prop-slide-right { from { transform: translateX(-50%); }  to { transform: translateX(0); } }
+@keyframes prop-slide-up    { from { transform: translateY(0); }     to { transform: translateY(-50%); } }
+@keyframes prop-slide-down  { from { transform: translateY(-50%); }  to { transform: translateY(0); } }
+
+/* gold star in each corner, sitting on top of the strip seams */
+.prop-star {
+  position: fixed;
+  z-index: 61;
+  width: var(--edge);
+  height: var(--edge);
+  display: grid;
+  place-items: center;
+  color: var(--gold);
+  font-size: 19px;
+  background: #7d0a19;
+  box-shadow: 0 0 0 2px var(--gold) inset;
+  pointer-events: none;
+  animation: prop-star-spin 9s linear infinite;
+}
+.prop-star--tl { top: 0; left: 0; }
+.prop-star--tr { top: 0; right: 0; }
+.prop-star--bl { bottom: 0; left: 0; }
+.prop-star--br { bottom: 0; right: 0; }
+@keyframes prop-star-spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 640px) {
+  :root { --edge: 26px; --edge-gap: 8px; }
+  .prop-strip { font-size: 12px; letter-spacing: .1em; }
+  .prop-star { width: var(--edge); height: var(--edge); font-size: 14px; }
+}
+
+/* the serial-number gag plate */
+/* ─── react nub: hover should feel like a thing you want to press ─── */
+.react-nub {
+  transition: background-color .16s ease, border-color .16s ease, color .16s ease,
+              box-shadow .18s ease, transform .18s cubic-bezier(.2, 1.6, .35, 1);
+}
+.react-nub:hover {
+  animation: react-bob .62s ease-in-out infinite;
+  box-shadow: 0 7px 20px rgba(255, 209, 0, .38), 0 0 0 3px rgba(255, 209, 0, .16);
+}
+.react-nub:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(255, 209, 0, .55);
+}
+.react-nub:active {
+  animation: none;
+  transform: translateY(2px) scale(.9);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, .5);
+}
+@keyframes react-bob {
+  0%, 100% { transform: translateY(-2px) scale(1.1) rotate(-4deg); }
+  50%      { transform: translateY(-7px) scale(1.16) rotate(4deg); }
+}
+
+/* reaction pills get a smaller share of the same energy */
+.react-pill { transition: transform .16s cubic-bezier(.2, 1.5, .35, 1), background-color .16s, border-color .16s; }
+.react-pill:hover { transform: translateY(-3px) scale(1.06); }
+.react-pill:active { transform: translateY(1px) scale(.96); }
+
+/* ─── cipher switch: the motion is what reads as "button" ─── */
+.cipher-switch { position: relative; cursor: pointer; }
+.cipher-switch .switch-label {
+  display: inline-block;
+  min-width: 4.6rem;
+  text-align: center;
+  animation: label-swap .34s cubic-bezier(.16, 1, .3, 1) both;
+}
+.cipher-switch .switch-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: currentColor;
+  animation: switch-blink 1.6s ease-in-out infinite;
+}
+.cipher-switch:hover .switch-dot { animation-duration: .7s; }
+@keyframes label-swap {
+  from { opacity: 0; transform: translateY(-6px); filter: blur(2px); }
+  to   { opacity: 1; transform: translateY(0); filter: blur(0); }
+}
+@keyframes switch-blink {
+  0%, 100% { opacity: .35; }
+  50%      { opacity: 1; }
+}
+
+.prop-plate {
+  font-family: var(--font-han);
+  font-weight: 900;
+  color: var(--red-ink);
+  background: var(--gold);
+  padding: 2px 10px;
+  letter-spacing: .12em;
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, .5);
+  transform: rotate(-1.5deg);
+}
+
+/* ─────────────────────────────────────────────
+   surfaces — same class names App.jsx already uses
+   ───────────────────────────────────────────── */
 
 .grid-glow {
   background-image:
-    linear-gradient(rgba(251, 191, 36, .035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(251, 191, 36, .035) 1px, transparent 1px),
-    radial-gradient(circle at 50% -20%, rgba(217, 119, 6, .16), transparent 42%);
-  background-size: 32px 32px, 32px 32px, auto;
+    linear-gradient(rgba(255, 209, 0, .05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 209, 0, .05) 1px, transparent 1px),
+    radial-gradient(circle at 50% -20%, rgba(255, 209, 0, .18), transparent 44%);
+  background-size: 28px 28px, 28px 28px, auto;
 }
 
 .aurora::before,
@@ -48,65 +246,77 @@ summary,
   width: 38rem;
   height: 38rem;
   border-radius: 9999px;
-  filter: blur(100px);
-  opacity: .12;
+  filter: blur(110px);
+  opacity: .16;
   pointer-events: none;
   animation: drift 15s ease-in-out infinite alternate;
 }
-
-.aurora::before { top: -18rem; left: -8rem; background: #f59e0b; }
-.aurora::after { right: -14rem; bottom: -20rem; background: #22d3ee; animation-delay: -7s; }
+.aurora::before { top: -18rem; left: -8rem; background: var(--gold); }
+.aurora::after  { right: -14rem; bottom: -20rem; background: #ff3b52; animation-delay: -7s; }
 
 .scanlines {
-  background-image: linear-gradient(to bottom, transparent 50%, rgba(0, 0, 0, .09) 50%);
-  background-size: 100% 4px;
+  background-image: linear-gradient(to bottom, transparent 50%, rgba(0, 0, 0, .12) 50%);
+  background-size: 100% 3px;
 }
 
 .rsa-matrix {
-  opacity: .72;
-  mask-image: linear-gradient(to right, black, rgba(0, 0, 0, .45) 48%, black);
+  opacity: .5;
+  mask-image: linear-gradient(to right, black, rgba(0, 0, 0, .35) 48%, black);
 }
 
+/* the chat panel is a poster pasted on the wall: hard shadow, no soft radius */
 .chat-shell {
   background:
-    linear-gradient(135deg, rgba(31, 26, 35, .97), rgba(13, 15, 22, .97) 58%, rgba(31, 20, 16, .95));
+    linear-gradient(135deg, #8d0d1e, #5c0a14 58%, #7d0a19);
+  border-radius: 4px !important;
+  box-shadow:
+    0 0 0 3px var(--gold),
+    0 0 0 8px var(--red-deep),
+    14px 14px 0 rgba(0, 0, 0, .55);
 }
 
 .chat-sidebar {
   background:
-    radial-gradient(circle at 20% 0%, rgba(251, 191, 36, .075), transparent 34%),
-    linear-gradient(180deg, rgba(30, 26, 35, .9), rgba(17, 17, 24, .96));
+    repeating-linear-gradient(135deg, rgba(255, 209, 0, .05) 0 8px, transparent 8px 16px),
+    linear-gradient(180deg, #a30f22, #6b0b17);
+  border-right: 3px solid var(--gold);
 }
 
 .chat-pane {
   background:
-    radial-gradient(circle at 72% 18%, rgba(34, 211, 238, .035), transparent 28%),
-    radial-gradient(circle at 28% 80%, rgba(245, 158, 11, .035), transparent 30%),
-    rgba(14, 15, 21, .78);
+    repeating-conic-gradient(from 0deg at 50% 0%,
+      rgba(255, 209, 0, .028) 0deg 2deg, transparent 2deg 8deg),
+    linear-gradient(180deg, rgba(46, 3, 11, .94), rgba(20, 1, 5, .97));
 }
 
 .chat-header {
-  background: linear-gradient(90deg, rgba(34, 29, 39, .78), rgba(22, 22, 29, .58));
+  background: linear-gradient(90deg, #d41f36, #8d0d1e);
+  border-bottom: 3px solid var(--gold);
 }
 
 .chat-composer {
-  background: linear-gradient(180deg, rgba(24, 22, 29, .78), rgba(14, 14, 20, .94));
+  background: linear-gradient(180deg, #6b0b17, #45050f);
+  border-top: 3px solid var(--gold);
 }
 
-.message-enter-left { animation: message-in-left .9s cubic-bezier(.16, .9, .25, 1) both; }
+/* ─────────────────────────────────────────────
+   motion — names unchanged, App.jsx depends on them
+   ───────────────────────────────────────────── */
+
+.message-enter-left  { animation: message-in-left .9s cubic-bezier(.16, .9, .25, 1) both; }
 .message-enter-right { animation: message-in-right .9s cubic-bezier(.16, .9, .25, 1) both; }
 .bubble-arrive { position: relative; overflow: hidden; }
 .bubble-arrive::after {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(105deg, transparent 25%, rgba(255,255,255,.28) 48%, transparent 72%);
+  background: linear-gradient(105deg, transparent 25%, rgba(255, 232, 115, .3) 48%, transparent 72%);
   transform: translateX(-140%);
   animation: bubble-sweep 1.05s .22s ease-out both;
   pointer-events: none;
 }
 .reaction-pop { animation: reaction-pop .34s cubic-bezier(.16, 1.45, .3, 1) both; }
-.sticker-pop { animation: sticker-pop .48s cubic-bezier(.16, 1.25, .3, 1) both; }
+.sticker-pop  { animation: sticker-pop .48s cubic-bezier(.16, 1.25, .3, 1) both; }
 .loading-line { animation: loading-line .42s cubic-bezier(.16, 1, .3, 1) both; }
 .loading-orbit { animation: loading-orbit 1.4s linear infinite; }
 .modal-exit { animation: modal-exit .65s cubic-bezier(.7, 0, .84, 0) both; }
@@ -115,9 +325,10 @@ summary,
 .modal-enter { animation: modal-in .5s cubic-bezier(.16, 1, .3, 1) both; }
 .float-slow { animation: float 4s ease-in-out infinite; }
 .status-pulse { animation: status-pulse 2s ease-out infinite; }
+.stamp-in { animation: stamp-in .38s cubic-bezier(.2, 1.6, .35, 1) both; }
 
 .cipher-text {
-  background-image: linear-gradient(90deg, #64748b, #fcd34d, #64748b);
+  background-image: linear-gradient(90deg, #ffd100, #fff6c9, #ffd100);
   background-size: 200% 100%;
   background-clip: text;
   color: transparent;
@@ -125,82 +336,61 @@ summary,
 }
 
 @keyframes message-in-left {
-  0% { opacity: 0; transform: translate3d(-46px, 12px, 0) scale(.9); filter: blur(5px); }
-  76% { opacity: 1; transform: translate3d(4px, -1px, 0) scale(1.01); filter: blur(0); }
+  0%   { opacity: 0; transform: translate3d(-46px, 12px, 0) scale(.9); filter: blur(5px); }
+  76%  { opacity: 1; transform: translate3d(4px, -1px, 0) scale(1.01); filter: blur(0); }
   100% { transform: translate3d(0, 0, 0) scale(1); }
 }
-
 @keyframes message-in-right {
-  0% { opacity: 0; transform: translate3d(46px, 12px, 0) scale(.9); filter: blur(5px); }
-  76% { opacity: 1; transform: translate3d(-4px, -1px, 0) scale(1.01); filter: blur(0); }
+  0%   { opacity: 0; transform: translate3d(46px, 12px, 0) scale(.9); filter: blur(5px); }
+  76%  { opacity: 1; transform: translate3d(-4px, -1px, 0) scale(1.01); filter: blur(0); }
   100% { transform: translate3d(0, 0, 0) scale(1); }
 }
-
-@keyframes bubble-sweep {
-  to { transform: translateX(140%); }
-}
-
+@keyframes bubble-sweep { to { transform: translateX(140%); } }
 @keyframes reaction-pop {
   from { opacity: 0; transform: translateY(7px) scale(.65) rotate(-8deg); }
-  to { opacity: 1; transform: translateY(0) scale(1) rotate(0); }
+  to   { opacity: 1; transform: translateY(0) scale(1) rotate(0); }
 }
-
 @keyframes sticker-pop {
   from { opacity: 0; transform: translateY(14px) scale(.9) rotate(-1deg); filter: blur(3px); }
-  to { opacity: 1; transform: translateY(0) scale(1) rotate(0); filter: blur(0); }
+  to   { opacity: 1; transform: translateY(0) scale(1) rotate(0); filter: blur(0); }
 }
-
 @keyframes loading-line {
   from { opacity: 0; transform: translateX(-10px); filter: blur(2px); }
-  to { opacity: 1; transform: translateX(0); filter: blur(0); }
+  to   { opacity: 1; transform: translateX(0); filter: blur(0); }
 }
-
-@keyframes loading-orbit {
-  to { transform: rotate(360deg); }
-}
-
-@keyframes modal-exit {
-  to { opacity: 0; transform: scale(1.025); filter: blur(8px); }
-}
-
+@keyframes loading-orbit { to { transform: rotate(360deg); } }
+@keyframes modal-exit { to { opacity: 0; transform: scale(1.025); filter: blur(8px); } }
 @keyframes send-burst {
-  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(245, 158, 11, .6); }
-  45% { transform: scale(.86) rotate(-8deg); }
-  100% { transform: scale(1); box-shadow: 0 0 0 18px rgba(245, 158, 11, 0); }
+  0%   { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 209, 0, .7); }
+  45%  { transform: scale(.86) rotate(-8deg); }
+  100% { transform: scale(1); box-shadow: 0 0 0 18px rgba(255, 209, 0, 0); }
 }
-
-@keyframes badge-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
+@keyframes badge-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes badge-strobe {
-  0%, 100% { box-shadow: 0 10px 28px rgba(0, 0, 0, .3), 0 0 0 0 rgba(245, 158, 11, 0); filter: brightness(1); }
-  50% { box-shadow: 0 10px 28px rgba(0, 0, 0, .3), 0 0 18px 2px rgba(245, 158, 11, .2); filter: brightness(1.1); }
+  0%, 100% { box-shadow: 0 10px 28px rgba(0, 0, 0, .35), 0 0 0 0 rgba(255, 209, 0, 0); filter: brightness(1); }
+  50%      { box-shadow: 0 10px 28px rgba(0, 0, 0, .35), 0 0 18px 2px rgba(255, 209, 0, .35); filter: brightness(1.12); }
 }
-
 @keyframes modal-in {
-  from { opacity: 0; transform: translateY(18px) scale(.96); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
+  from { opacity: 0; transform: translateY(18px) scale(.96) rotate(-.45deg); }
+  to   { opacity: 1; transform: translateY(0) scale(1) rotate(-.15deg); }
 }
-
-@keyframes drift {
-  to { transform: translate3d(5rem, 3rem, 0) scale(1.15); }
+@keyframes stamp-in {
+  from { opacity: 0; transform: scale(2.4) rotate(-22deg); }
+  to   { opacity: 1; transform: scale(1) rotate(-11deg); }
 }
-
-@keyframes float {
-  50% { transform: translateY(-7px); }
-}
-
+@keyframes drift { to { transform: translate3d(5rem, 3rem, 0) scale(1.15); } }
+@keyframes float { 50% { transform: translateY(-7px); } }
 @keyframes status-pulse {
-  0% { transform: scale(.8); opacity: .8; }
+  0%        { transform: scale(.8); opacity: .85; }
   70%, 100% { transform: scale(2.4); opacity: 0; }
 }
-
-@keyframes cipher-shimmer {
-  to { background-position: -200% 0; }
-}
+@keyframes cipher-shimmer { to { background-position: -200% 0; } }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+  .prop-track { animation: none !important; }
 }
