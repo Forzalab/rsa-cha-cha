@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Activity, ArrowDown, Fingerprint, ImagePlus, LockKeyhole, Radio, Send, ShieldCheck, Smile, SmilePlus, Users } from 'lucide-react'
+import { Activity, ArrowDown, Eye, EyeOff, Fingerprint, ImagePlus, LockKeyhole, Radio, Send, ShieldCheck, Smile, SmilePlus, Users } from 'lucide-react'
 import { JoinModal } from './components/JoinModal.jsx'
 import { RsaMatrixBackground } from './components/RsaMatrixBackground.jsx'
 import { useChatSocket } from './hooks/useChatSocket.js'
@@ -28,6 +28,11 @@ export default function App() {
   const [entryComplete, setEntryComplete] = useState(false)
   const [sendCoolingDown, setSendCoolingDown] = useState(false)
   const completeEntry = useCallback(() => setEntryComplete(true), [])
+  // Chinese shows first, English swaps in — the motion is what says 'button'
+  useEffect(() => {
+    const tick = window.setInterval(() => setLabelEnglish((on) => !on), 2600)
+    return () => window.clearInterval(tick)
+  }, [])
   const draftLength = [...draft].length
   const charactersOver = Math.max(0, draftLength - MAX_MESSAGE_LENGTH)
   const [showNewMessages, setShowNewMessages] = useState(false)
@@ -36,6 +41,8 @@ export default function App() {
   const previousMessageCountRef = useRef(0)
   const [revealsLeft, setRevealsLeft] = useState(2)
   const [allCipher, setAllCipher] = useState(false)
+  const [hoveredCipher, setHoveredCipher] = useState(null)
+  const [labelEnglish, setLabelEnglish] = useState(false)
   const [ciphered, setCiphered] = useState(() => new Set())
   const flipCipher = (id) => setCiphered((current) => {
     const next = new Set(current)
@@ -118,8 +125,22 @@ export default function App() {
         <div className="chat-pane relative flex min-w-0 flex-1 flex-col">
           <header className="chat-header flex h-20 items-center justify-between border-b border-slate-300/8 px-5 sm:px-7">
                <div className="flex items-center gap-3"><h2 className="font-semibold tracking-tight text-white">加密房间 · Encrypted Room</h2></div>
-            <button type="button" onClick={(event) => { event.stopPropagation(); setAllCipher((on) => !on); setCiphered(new Set()) }} aria-pressed={allCipher} className={`han flex shrink-0 items-center gap-2 rounded-full border-2 px-4 py-1.5 text-xs transition ${allCipher ? 'border-[#ffd100] bg-[#ffd100] text-[#4a0410]' : 'border-[#ffd100]/60 bg-[#4a0410]/50 text-[#ffe873] hover:border-[#ffd100]'}`}>
-              {allCipher ? '密文' : '明文'}
+            <button
+              type="button"
+              onClick={(event) => { event.stopPropagation(); setAllCipher((on) => !on); setCiphered(new Set()) }}
+              aria-pressed={allCipher}
+              aria-label={allCipher ? 'Show plaintext' : 'Show ciphertext'}
+              className={`cipher-switch group/switch flex shrink-0 items-center gap-2 rounded-full border-2 px-3 py-1.5 text-xs font-bold transition active:translate-y-px ${allCipher
+                ? 'border-[#4a0410] bg-[#ffd100] text-[#4a0410] shadow-[0_3px_0_#4a0410] hover:shadow-[0_5px_0_#4a0410] hover:-translate-y-0.5'
+                : 'border-[#ffd100] bg-[#4a0410] text-[#ffe873] shadow-[0_3px_0_#8a0a1c] hover:shadow-[0_5px_0_#8a0a1c] hover:-translate-y-0.5'}`}
+            >
+              {allCipher ? <EyeOff size={14} /> : <Eye size={14} />}
+              <span className={`switch-label ${labelEnglish ? '' : 'han'}`} key={`${allCipher}-${labelEnglish}`}>
+                {allCipher
+                  ? (labelEnglish ? 'See plaintext' : '密文')
+                  : (labelEnglish ? 'See ciphertext' : '明文')}
+              </span>
+              <span className="switch-dot" />
             </button>
           </header>
 
@@ -137,9 +158,15 @@ export default function App() {
               const visibleReactions = reactions.slice(0, 3)
               const reactionTrayOpen = openReactions === message.id
               const { sticker, caption } = parseStickerMessage(message.plaintext)
-              const showCipher = !message.isAi && Boolean(message.cipher) && (allCipher !== ciphered.has(message.id))
+              // Messenger rule: the react affordance is always visible on the last
+              // incoming bubble of a group. Everywhere else it stays hover-only.
+              const pinnedReact = !own && !message.isAi && lastOfGroup
+              const showCipher = !message.isAi && Boolean(message.cipher)
+                && ((allCipher !== ciphered.has(message.id)) || hoveredCipher === message.id)
               return (
                 <article key={message.id}
+  onMouseEnter={() => { if (!message.isAi) setHoveredCipher(message.id) }}
+  onMouseLeave={() => setHoveredCipher((current) => (current === message.id ? null : current))}
   className={`group/message max-w-[82%] sm:max-w-[70%] ${firstOfGroup ? 'mt-4 first:mt-0' : ''} ${own ? 'message-enter-right ml-auto' : 'message-enter-left'}`}>
                 {firstOfGroup && (
                   <p className={`mb-1 flex items-center gap-1.5 text-xs text-[#f4e4c1]/55 ${own ? 'justify-end text-right' : ''}`}>
@@ -154,7 +181,6 @@ export default function App() {
                   ) : (<div
   role={message.isAi ? undefined : 'button'}
   tabIndex={message.isAi ? undefined : 0}
-  title={message.isAi ? undefined : 'Tap to swap plaintext and ciphertext'}
   onClick={(event) => { if (message.isAi) return; event.stopPropagation(); flipCipher(message.id) }}
   onKeyDown={(event) => { if (message.isAi) return; if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); flipCipher(message.id) } }}
   className={`bubble-arrive max-w-full whitespace-pre-wrap break-words [overflow-wrap:anywhere] border px-4 py-3 text-sm leading-6 shadow-lg ${message.isAi ? '' : 'cursor-pointer select-none'}
@@ -178,11 +204,13 @@ export default function App() {
       />
     : message.plaintext}</div>
                   )}
-                  <div className={`relative flex items-center gap-1.5 ${reactions.length || reactionTrayOpen ? 'mt-2 h-7' : 'h-0'} ${own ? 'justify-end' : ''}`}>
+                  <div className={`relative flex items-center gap-1.5 ${reactions.length || reactionTrayOpen ? 'mt-2 h-7' : pinnedReact ? 'mt-1 h-8' : 'h-0'} ${own ? 'justify-end' : ''}`}>
                     {visibleReactions.map(([emoji, people]) => (
                       <button type="button" key={emoji} onClick={(event) => { event.stopPropagation(); chat.react(message.id, emoji) }} title={people.join(', ')} className={`reaction-pop flex h-7 items-center gap-1 rounded-full border px-2 text-xs transition hover:-translate-y-0.5 ${people.includes(chat.username) ? 'border-red-400/35 bg-red-500/15 text-amber-200' : 'border-red-400/15 bg-red-500/[.07] text-[#f4e4c1]/85 hover:border-red-400/35 hover:bg-red-500/15'}`}><span>{emoji}</span><span className="text-[10px] text-[#f4e4c1]/55">{people.length}</span></button>
                     ))}
-                    <button type="button" onClick={(event) => { event.stopPropagation(); setOpenReactions(reactionTrayOpen ? null : message.id) }} className={`absolute ${own ? 'right-full mr-1.5' : 'left-full ml-1.5'} bottom-0 grid h-7 min-w-7 place-items-center rounded-full border border-[#ffd100]/20 bg-black/40 px-2 text-xs tracking-widest text-[#f4e4c1]/55 transition hover:border-[#ffd100]/50 hover:text-[#ffd100] ${reactions.length || reactionTrayOpen ? 'opacity-100' : 'opacity-0 group-hover/message:opacity-100 focus:opacity-100'}`} aria-label="View and add reactions">•••</button>
+                    <button type="button" onClick={(event) => { event.stopPropagation(); setOpenReactions(reactionTrayOpen ? null : message.id) }} className={`grid h-8 w-8 shrink-0 place-items-center rounded-full border border-[#ffd100]/25 bg-[#4a0410] text-[#f4e4c1]/60 shadow-lg shadow-black/40 transition hover:scale-110 hover:border-[#ffd100] hover:text-[#ffd100] ${pinnedReact
+                      ? 'opacity-100'
+                      : `absolute ${own ? 'right-full mr-2' : 'left-full ml-2'} bottom-0 ${reactions.length || reactionTrayOpen ? 'opacity-100' : 'opacity-0 group-hover/message:opacity-100 focus:opacity-100'}`}`} aria-label="View and add reactions"><SmilePlus size={15} /></button>
                     {reactionTrayOpen && (
                       <div onClick={(event) => event.stopPropagation()} className={`reaction-pop absolute bottom-9 z-30 min-w-52 rounded-2xl border border-amber-200/10 bg-[#1b181f]/95 p-2 shadow-2xl shadow-black/50 backdrop-blur-xl ${own ? 'right-0' : 'left-0'}`}>
                         {reactions.length > 0 && <p className="px-2 pb-1.5 text-[10px] font-semibold uppercase tracking-[.16em] text-[#f4e4c1]/45">Reactions</p>}
@@ -217,13 +245,13 @@ export default function App() {
                 </div>
               </div>
             )}
-            <div className="flex items-end gap-2 rounded-2xl border border-white/10 bg-black/25 p-2 shadow-inner shadow-black/20 transition-all duration-300 hover:border-white/20 hover:bg-black/30 hover:shadow-[0_0_24px_rgba(52,211,153,.045)] focus-within:border-red-500/35 focus-within:bg-black/30 focus-within:shadow-[0_0_32px_rgba(52,211,153,.085)]">
-              <button type="button" onClick={(event) => { event.stopPropagation(); setStickerPickerOpen((open) => !open); setEmojiPickerOpen(false); setOpenReactions(null) }} disabled={!joined} aria-label="Open image picker" className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl border transition disabled:opacity-30 ${stickerPickerOpen ? 'border-red-400/30 bg-red-500/10 text-[#ffe873]' : 'border-transparent text-[#f4e4c1]/55 hover:bg-white/5 hover:text-[#f4e4c1]/85'}`}><ImagePlus size={19} /></button>
-              <button type="button" onClick={(event) => { event.stopPropagation(); setEmojiPickerOpen((open) => !open); setStickerPickerOpen(false); setOpenReactions(null) }} disabled={!joined} aria-label="Open emoji picker" className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl border transition disabled:opacity-30 ${emojiPickerOpen ? 'border-red-400/30 bg-red-500/10 text-[#ffe873]' : 'border-transparent text-[#f4e4c1]/55 hover:bg-white/5 hover:text-[#f4e4c1]/85'}`}><Smile size={19} /></button>
-              <textarea value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) send(event) }} disabled={!joined} rows="1" wrap="soft" placeholder="Message the room…" aria-invalid={charactersOver > 0} className={`max-h-32 min-h-11 min-w-0 flex-1 resize-none overflow-y-auto whitespace-pre-wrap break-words [overflow-wrap:anywhere] bg-transparent px-3 py-3 text-sm outline-none placeholder:text-[#f4e4c1]/45 ${charactersOver ? 'text-rose-300' : 'text-[#f4e4c1]/85'}`} />
-              <button disabled={!joined || !draft.trim() || charactersOver > 0 || sendCoolingDown} aria-label="Send message" className={`group grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br from-red-400 to-red-600 text-yellow-100 shadow-lg shadow-yellow-100/30 transition duration-200 hover:-translate-y-0.5 hover:shadow-red-500/20 active:translate-y-0 disabled:opacity-30 ${sendPulse ? 'send-burst' : ''}`}><Send className="transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" size={18} /></button>
+            <div className="flex items-end gap-1.5 rounded-[1.75rem] border-2 border-[#ffd100]/25 bg-black/35 p-1.5 shadow-inner shadow-black/40 transition-all duration-300 hover:border-[#ffd100]/45 focus-within:border-[#ffd100]/70 focus-within:bg-black/45 focus-within:shadow-[0_0_28px_rgba(255,209,0,.12)]">
+              <button type="button" onClick={(event) => { event.stopPropagation(); setStickerPickerOpen((open) => !open); setEmojiPickerOpen(false); setOpenReactions(null) }} disabled={!joined} aria-label="Open image picker" className={`grid h-10 w-10 shrink-0 place-items-center rounded-full transition duration-150 hover:scale-110 disabled:opacity-30 disabled:hover:scale-100 ${stickerPickerOpen ? 'bg-[#ffd100] text-[#4a0410]' : 'text-[#ffd100]/70 hover:bg-[#ffd100]/12 hover:text-[#ffd100]'}`}><ImagePlus size={19} /></button>
+              <button type="button" onClick={(event) => { event.stopPropagation(); setEmojiPickerOpen((open) => !open); setStickerPickerOpen(false); setOpenReactions(null) }} disabled={!joined} aria-label="Open emoji picker" className={`grid h-10 w-10 shrink-0 place-items-center rounded-full transition duration-150 hover:scale-110 disabled:opacity-30 disabled:hover:scale-100 ${emojiPickerOpen ? 'bg-[#ffd100] text-[#4a0410]' : 'text-[#ffd100]/70 hover:bg-[#ffd100]/12 hover:text-[#ffd100]'}`}><Smile size={19} /></button>
+              <textarea value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) send(event) }} disabled={!joined} rows="1" wrap="soft" placeholder="Message the room…" aria-invalid={charactersOver > 0} className={`max-h-32 min-h-10 min-w-0 flex-1 resize-none overflow-y-auto whitespace-pre-wrap break-words [overflow-wrap:anywhere] bg-transparent px-2 py-2.5 text-sm outline-none placeholder:text-[#f4e4c1]/40 ${charactersOver ? 'text-rose-300' : 'text-[#f4e4c1]/85'}`} />
+              <button disabled={!joined || !draft.trim() || charactersOver > 0 || sendCoolingDown} aria-label="Send message" className={`group grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#ffd100] text-[#4a0410] shadow-[0_3px_0_#8a0a1c] transition duration-150 hover:-translate-y-0.5 hover:shadow-[0_5px_0_#8a0a1c] active:translate-y-px active:shadow-[0_1px_0_#8a0a1c] disabled:opacity-25 disabled:shadow-none disabled:hover:translate-y-0 ${sendPulse ? 'send-burst' : ''}`}><Send className="transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" size={18} /></button>
             </div>
-            <div className="mt-1.5 flex h-4 justify-end px-2 text-[10px]">
+            <div className={`flex justify-end px-3 text-[10px] ${charactersOver > 0 || draftLength >= 450 || /\bkerney\b/i.test(draft) ? 'mt-1.5 h-4' : 'h-0'}`}>
               {charactersOver > 0 ? <span className="font-medium text-rose-400">Remove {charactersOver} character{charactersOver === 1 ? '' : 's'} to send</span> : /\bkerney\b/i.test(draft) ? <span className="text-yellow-400/60">Careful what you wish for.</span> : draftLength >= 450 ? <span className={draftLength >= 490 ? 'text-[#ffe873]' : 'text-[#f4e4c1]/45'}>{draftLength}/{MAX_MESSAGE_LENGTH}</span> : null}
             </div>
           </form>

@@ -73,7 +73,7 @@ export function JoinModal({ connectionStatus, serverError, onJoin, onClearError,
   if (phase !== 'form') return (
     <div className={`fixed inset-0 z-50 grid place-items-center overflow-hidden bg-[#4a0410]/92 px-12 py-12 ${phase === 'exit' ? 'modal-exit' : ''}`}>
       {rays}
-      <div className="relative w-full max-w-lg -rotate-1 border-[3px] border-[#ffd100] bg-[#7d0a19] p-7 shadow-[14px_14px_0_rgba(0,0,0,.55)]">
+      <div className="relative w-full max-w-lg -rotate-[.15deg] border-[3px] border-[#ffd100] bg-[#7d0a19] p-7 shadow-[14px_14px_0_rgba(0,0,0,.55)]">
         <div className="flex items-center justify-between border-b-2 border-[#ffd100]/50 pb-4">
           <div>
             <p className="han text-[11px] text-[#ffd100]">身份审查中</p>
