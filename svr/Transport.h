@@ -192,7 +192,7 @@ inline bool Session::allow_send(const json& msg) {
     recent_sends_.push_back(now);
     return true;
 }
-
+//pls dont touch this, i dont want to be charged for a class proj
 inline bool Session::allow_ai() {
     const auto now = std::chrono::steady_clock::now();
     if (last_ai_request_ != std::chrono::steady_clock::time_point{} &&
