@@ -35,6 +35,13 @@ export default function App() {
   const atBottomRef = useRef(true)
   const previousMessageCountRef = useRef(0)
   const [revealsLeft, setRevealsLeft] = useState(2)
+  const [allCipher, setAllCipher] = useState(false)
+  const [ciphered, setCiphered] = useState(() => new Set())
+  const flipCipher = (id) => setCiphered((current) => {
+    const next = new Set(current)
+    next.has(id) ? next.delete(id) : next.add(id)
+    return next
+  })
   const [revealed, setRevealed] = useState(() => new Set())
 
   function scrollToNewest(behavior = 'smooth') {
@@ -111,7 +118,9 @@ export default function App() {
         <div className="chat-pane relative flex min-w-0 flex-1 flex-col">
           <header className="chat-header flex h-20 items-center justify-between border-b border-slate-300/8 px-5 sm:px-7">
                <div className="flex items-center gap-3"><h2 className="font-semibold tracking-tight text-white">加密房间 · Encrypted Room</h2></div>
-            <span className="flex items-center gap-2 rounded-full border border-[#ffd100]/60 bg-[#4a0410]/50 px-3 py-1.5 text-xs text-[#ffe873] shadow-inner shadow-red-400/5"> End-to-end RSA</span>
+            <button type="button" onClick={(event) => { event.stopPropagation(); setAllCipher((on) => !on); setCiphered(new Set()) }} aria-pressed={allCipher} className={`han flex shrink-0 items-center gap-2 rounded-full border-2 px-4 py-1.5 text-xs transition ${allCipher ? 'border-[#ffd100] bg-[#ffd100] text-[#4a0410]' : 'border-[#ffd100]/60 bg-[#4a0410]/50 text-[#ffe873] hover:border-[#ffd100]'}`}>
+              {allCipher ? '密文' : '明文'}
+            </button>
           </header>
 
           <div ref={messageListRef} onScroll={handleMessageScroll} className="flex flex-1 flex-col gap-1 overflow-y-auto scroll-smooth p-5 sm:p-7">
@@ -128,6 +137,7 @@ export default function App() {
               const visibleReactions = reactions.slice(0, 3)
               const reactionTrayOpen = openReactions === message.id
               const { sticker, caption } = parseStickerMessage(message.plaintext)
+              const showCipher = !message.isAi && Boolean(message.cipher) && (allCipher !== ciphered.has(message.id))
               return (
                 <article key={message.id}
   className={`group/message max-w-[82%] sm:max-w-[70%] ${firstOfGroup ? 'mt-4 first:mt-0' : ''} ${own ? 'message-enter-right ml-auto' : 'message-enter-left'}`}>
@@ -141,7 +151,13 @@ export default function App() {
                       <StickerImage sticker={sticker} />
                       {caption && <p className={`mx-1 mt-1 whitespace-pre-wrap break-words [overflow-wrap:anywhere] rounded-xl px-3 py-2.5 text-sm leading-6 ${own ? 'bg-red-500 text-yellow-100' : 'bg-white/[.06] text-[#f4e4c1]/90'}`}>{caption}</p>}
                     </div>
-                  ) : (<div className={`bubble-arrive max-w-full whitespace-pre-wrap break-words [overflow-wrap:anywhere] border px-4 py-3 text-sm leading-6 shadow-lg
+                  ) : (<div
+  role={message.isAi ? undefined : 'button'}
+  tabIndex={message.isAi ? undefined : 0}
+  title={message.isAi ? undefined : 'Tap to swap plaintext and ciphertext'}
+  onClick={(event) => { if (message.isAi) return; event.stopPropagation(); flipCipher(message.id) }}
+  onKeyDown={(event) => { if (message.isAi) return; if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); flipCipher(message.id) } }}
+  className={`bubble-arrive max-w-full whitespace-pre-wrap break-words [overflow-wrap:anywhere] border px-4 py-3 text-sm leading-6 shadow-lg ${message.isAi ? '' : 'cursor-pointer select-none'}
   ${own
     ? `border-amber-200/20 bg-gradient-to-br from-red-400 to-red-600 text-yellow-100 shadow-yellow-100/20
        rounded-l-2xl ${firstOfGroup ? 'rounded-tr-2xl' : 'rounded-tr-md'} ${lastOfGroup ? 'rounded-br-md' : 'rounded-br-md'}`
@@ -149,20 +165,22 @@ export default function App() {
       ? `border-yellow-400/20 bg-red-950/40 text-[#f4e4c1]
          rounded-r-2xl ${firstOfGroup ? 'rounded-tl-2xl' : 'rounded-tl-md'} rounded-bl-md`
       : `border-[#ffd100]/20 bg-black/35 text-[#f4e4c1] shadow-black/30 backdrop-blur-md
-         rounded-r-2xl ${firstOfGroup ? 'rounded-tl-2xl' : 'rounded-tl-md'} rounded-bl-md`}`}>{!own && !revealed.has(message.id) && revealsLeft > 0
-  ? <CipherReveal
-      text={message.plaintext}
-      cipher={message.cipher}
-      onDone={() => {
-        setRevealed((s) => new Set(s).add(message.id))
-        setRevealsLeft((n) => n - 1)
-      }}
-    />
-  : message.plaintext}</div>
+         rounded-r-2xl ${firstOfGroup ? 'rounded-tl-2xl' : 'rounded-tl-md'} rounded-bl-md`}`}>{showCipher
+  ? <span className="cipher-text block break-all font-mono text-[11px] leading-4">{message.cipher}</span>
+  : !own && !revealed.has(message.id) && revealsLeft > 0
+    ? <CipherReveal
+        text={message.plaintext}
+        cipher={message.cipher}
+        onDone={() => {
+          setRevealed((s) => new Set(s).add(message.id))
+          setRevealsLeft((n) => n - 1)
+        }}
+      />
+    : message.plaintext}</div>
                   )}
-                  <div className={`relative mt-2 flex h-7 items-center gap-1.5 ${own ? 'justify-end' : ''}`}>
+                  <div className={`relative flex items-center gap-1.5 ${reactions.length || reactionTrayOpen ? 'mt-2 h-7' : 'h-0'} ${own ? 'justify-end' : ''}`}>
                     {visibleReactions.map(([emoji, people]) => (
-                      <button type="button" key={emoji} onClick={(event) => { event.stopPropagation(); chat.react(message.id, emoji) }} title={people.join(', ')} className={`reaction-pop flex h-7 items-center gap-1 rounded-full border px-2 text-xs transition hover:-translate-y-0.5 ${people.includes(chat.username) ? 'border-red-400/35 bg-red-500/15 text-amber-200' : 'border-red-400/15 bg-red-500/[.07] text-[#f4e4c1]/85hover:border-red-400/35 hover:bg-red-500/15'}`}><span>{emoji}</span><span className="text-[10px] text-[#f4e4c1]/55">{people.length}</span></button>
+                      <button type="button" key={emoji} onClick={(event) => { event.stopPropagation(); chat.react(message.id, emoji) }} title={people.join(', ')} className={`reaction-pop flex h-7 items-center gap-1 rounded-full border px-2 text-xs transition hover:-translate-y-0.5 ${people.includes(chat.username) ? 'border-red-400/35 bg-red-500/15 text-amber-200' : 'border-red-400/15 bg-red-500/[.07] text-[#f4e4c1]/85 hover:border-red-400/35 hover:bg-red-500/15'}`}><span>{emoji}</span><span className="text-[10px] text-[#f4e4c1]/55">{people.length}</span></button>
                     ))}
                     <button type="button" onClick={(event) => { event.stopPropagation(); setOpenReactions(reactionTrayOpen ? null : message.id) }} className={`absolute ${own ? 'right-full mr-1.5' : 'left-full ml-1.5'} bottom-0 grid h-7 min-w-7 place-items-center rounded-full border border-[#ffd100]/20 bg-black/40 px-2 text-xs tracking-widest text-[#f4e4c1]/55 transition hover:border-[#ffd100]/50 hover:text-[#ffd100] ${reactions.length || reactionTrayOpen ? 'opacity-100' : 'opacity-0 group-hover/message:opacity-100 focus:opacity-100'}`} aria-label="View and add reactions">•••</button>
                     {reactionTrayOpen && (
@@ -174,7 +192,6 @@ export default function App() {
                       </div>
                     )}
                   </div>
-                  {!message.isAi && <details className={`group mt-1.5 text-[11px] text-[#f4e4c1]/45 ${own ? 'text-right' : ''}`}><summary className="cursor-pointer list-none transition hover:text-red-500">⌁ View ciphertext</summary><p className="cipher-text mt-1 max-w-lg break-all font-mono leading-4">{message.cipher}</p></details>}
                 </article>
               )
             })}
