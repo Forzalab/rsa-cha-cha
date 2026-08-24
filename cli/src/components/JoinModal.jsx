@@ -15,9 +15,10 @@ const SECURITY_CHECKS = [
 export function JoinModal({ connectionStatus, serverError, onJoin, onClearError, onComplete }) {
   const [name, setName] = useState('')
   const [localError, setLocalError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
   const [phase, setPhase] = useState('form')
   const [checksVisible, setChecksVisible] = useState(0)
-  const busy = connectionStatus === 'connecting' || connectionStatus === 'joining'
+  const busy = connectionStatus === 'connecting' || submitting
 
   useEffect(() => {
     if (phase === 'loading') {
@@ -44,10 +45,12 @@ export function JoinModal({ connectionStatus, serverError, onJoin, onClearError,
     }
     setLocalError('')
     onClearError()
+    setSubmitting(true)
     try {
       await onJoin(username)
       setPhase('loading')
     } catch { /* displayed by the socket hook */ }
+    finally { setSubmitting(false) }
   }
 
   if (phase !== 'form') return (
@@ -94,7 +97,7 @@ export function JoinModal({ connectionStatus, serverError, onJoin, onClearError,
 
         <button disabled={busy || connectionStatus === 'disconnected'} className="group mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-400 to-orange-300 px-4 py-3 font-semibold text-amber-950 shadow-lg shadow-amber-500/15 transition duration-300 hover:-translate-y-0.5 hover:shadow-amber-400/25 active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50">
           {busy && <LoaderCircle className="animate-spin" size={18} />}
-          {connectionStatus === 'connecting' ? 'Connecting…' : connectionStatus === 'joining' ? 'Joining…' : connectionStatus === 'disconnected' ? 'Server offline' : 'Join chat'}
+          {connectionStatus === 'connecting' ? 'Connecting…' : submitting ? 'Joining…' : connectionStatus === 'disconnected' ? 'Server offline' : 'Join chat'}
         </button>
       </form>
     </div>

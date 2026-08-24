@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { errorText, joinMessage, parseFrame, sendMessage } from '../lib/protocol.js'
+import { errorText, joinMessage, kerneyRequest, parseFrame, sendMessage } from '../lib/protocol.js'
 import { decryptText, DEV_KEYPAIR, encryptText } from '../lib/rsa.js'
+import { isRosas, randomMandarinPhrase } from '../lib/rosasMode.js'
 
 const DEFAULT_URL = `ws://${window.location.hostname || 'localhost'}:6868`
 const MAX_MESSAGE_LENGTH = 500
@@ -14,6 +15,7 @@ export function useChatSocket(url = import.meta.env.VITE_WS_URL || DEFAULT_URL) 
   const [members, setMembers] = useState([])
   const [error, setError] = useState('')
   const [messages, setMessages] = useState([])
+  const [kerneyThinking, setKerneyThinking] = useState(false)
 
   const applyReaction = useCallback((messageId, emoji, sender, action = 'ADD') => {
     setMessages((current) => current.map((message) => {
@@ -77,11 +79,25 @@ export function useChatSocket(url = import.meta.env.VITE_WS_URL || DEFAULT_URL) 
               reactions: {},
             }])
           }
+        } else if (message.request === 'AI_THINKING') {
+          setKerneyThinking(true)
+        } else if (message.request === 'AI_DELIVER') {
+          setKerneyThinking(false)
+          setMessages((current) => current.some((item) => item.id === message.content?.message_id) ? current : [...current, {
+            id: message.content?.message_id ?? crypto.randomUUID(), sender: 'kerney',
+            plaintext: message.content?.text ?? '', cipher: '', reactions: {}, isAi: true,
+          }])
         } else if (message.request.startsWith('ERR_')) {
           const text = errorText(message.request)
           setError(text)
-          pendingJoinRef.current?.reject(new Error(text))
-          pendingJoinRef.current = null
+          if (message.request.startsWith('ERR_AI_')) setKerneyThinking(false)
+          if (pendingJoinRef.current) {
+            pendingJoinRef.current.reject(new Error(text))
+            pendingJoinRef.current = null
+            // A rejected JOIN does not close the WebSocket. Return the modal
+            // to its ready state so the visitor can try another username.
+            setStatus('connected')
+          }
         }
       } catch {
         setError('Received an unreadable response from the server.')
@@ -115,15 +131,19 @@ export function useChatSocket(url = import.meta.env.VITE_WS_URL || DEFAULT_URL) 
     if (now - lastSendAtRef.current < SEND_COOLDOWN_MS) return false
     lastSendAtRef.current = now
 
-    const cipher = encryptText(plaintext)
+    const outgoingPlaintext = isRosas(username) ? randomMandarinPhrase() : plaintext
+    const cipher = encryptText(outgoingPlaintext)
     const messageId = crypto.randomUUID()
     const recipients = members.filter((member) => member !== username)
     for (const recipient of recipients) {
       socket.send(JSON.stringify(sendMessage(username, recipient, cipher, { message_id: messageId, event_id: messageId })))
     }
     setMessages((current) => [...current, {
-      id: messageId, sender: username, plaintext, cipher, reactions: {},
+      id: messageId, sender: username, plaintext: outgoingPlaintext, cipher, reactions: {},
     }])
+    if (/\bkerney\b/i.test(outgoingPlaintext)) {
+      socket.send(JSON.stringify(kerneyRequest(username, outgoingPlaintext, messageId)))
+    }
     return true
   }, [members, username])
 
@@ -142,5 +162,5 @@ export function useChatSocket(url = import.meta.env.VITE_WS_URL || DEFAULT_URL) 
     applyReaction(messageId, emoji, username, action)
   }, [applyReaction, members, messages, username])
 
-  return { status, username, members, messages, error, join, send, react, clearError: () => setError('') }
+  return { status, username, members, messages, kerneyThinking, error, join, send, react, clearError: () => setError('') }
 }
