@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { Activity, ArrowDown, Eye, EyeOff, Fingerprint, ImagePlus, LockKeyhole, Radio, Send, ShieldCheck, Smile, SmilePlus, Users } from 'lucide-react'
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
+import { Activity, ArrowDown, Eye, EyeOff, Fingerprint, ImagePlus, LockKeyhole, Radio, Send, ShieldCheck, Smile, SmilePlus } from 'lucide-react'
 import { JoinModal } from './components/JoinModal.jsx'
 import { RsaMatrixBackground } from './components/RsaMatrixBackground.jsx'
 import { useChatSocket } from './hooks/useChatSocket.js'
 import { parseStickerMessage, STICKERS, stickerShortcode } from './lib/stickers.js'
 import { EMOJIS } from './lib/emojis.js'
+import { isKerney, joinSlug } from './lib/joinSlugs.js'
 import { CipherReveal } from './components/CipherReveal.jsx'
 import { PropagandaFrame } from './components/PropagandaFrame.jsx'
 
@@ -15,6 +16,76 @@ function StickerImage({ sticker, compact = false }) {
   const [failed, setFailed] = useState(false)
   if (failed) return <div className={`${compact ? 'h-24' : 'h-44'} grid w-full place-items-center rounded-xl border border-dashed border-white/10 bg-white/[.025] px-3 text-center text-xs text-[#f4e4c1]/45`}>{sticker.label}<br />asset needed</div>
   return <img src={sticker.src} alt={sticker.label} onError={() => setFailed(true)} className={`${compact ? 'h-24' : 'max-h-72'} w-full rounded-xl object-cover`} />
+}
+
+const BANNERS = [
+  ['加密万岁', 'Now with RSA!'],
+  ['明文可耻', 'Ciphertext is glory'],
+  ['质数光荣', 'Primes on duty'],
+  ['取模不停', 'The modulus never sleeps'],
+  ['信道正常', 'Channel nominal'],
+  ['分号已发', 'Semicolons issued'],
+]
+
+function RollingBanner() {
+  const [index, setIndex] = useState(0)
+  useEffect(() => {
+    const tick = window.setInterval(() => setIndex((n) => (n + 1) % BANNERS.length), 4200)
+    return () => window.clearInterval(tick)
+  }, [])
+  const [han, latin] = BANNERS[index]
+  return (
+    <div className="banner-plaque flex h-9 w-[15.5rem] shrink-0 items-center justify-center overflow-hidden border-2 border-[#ffd100] bg-[#4a0410] px-3">
+      <span key={index} className="banner-line flex items-baseline gap-2 whitespace-nowrap text-[#ffd100]">
+        <span className="han text-[13px] leading-none">{han}</span>
+        <span className="text-[#ffd100]/50">·</span>
+        <span className="text-[12px] font-bold leading-none">{latin}</span>
+      </span>
+    </div>
+  )
+}
+
+const PROMPTS = [
+  '请畅所欲言 · Speak freely, the modulus is listening',
+  '砸键盘吧 · Smash your keyboard for the collective',
+  '你在想什么？ · What are you thinking, comrade?',
+  '光荣发言 · Promote eternal glory, 450 characters max',
+  '明文可耻 · Type something shameful, we will encrypt it',
+  '请勿泄露私钥 · Do not leak your private key in here',
+  '大声说出你的余数 · Announce your remainder proudly',
+  '今日质数已就位 · Today\'s prime is standing by',
+  '分号已配发到户 · Semicolons have been issued to all',
+  '编译器正在倾听 · The compiler is listening',
+  '为模运算而战 · Say something for modular arithmetic',
+  '作业尚未提交 · The homework remains unsubmitted',
+]
+
+function RollingPlaceholder() {
+  const [index, setIndex] = useState(() => Math.floor(Math.random() * PROMPTS.length))
+  useEffect(() => {
+    const tick = window.setInterval(() => setIndex((n) => (n + 1) % PROMPTS.length), 3600)
+    return () => window.clearInterval(tick)
+  }, [])
+  return (
+    <span aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 flex items-center overflow-hidden px-2">
+      <span key={index} className="rolling-prompt truncate text-sm leading-5">{PROMPTS[index]}</span>
+    </span>
+  )
+}
+
+function JoinSlug({ notice }) {
+  const tone = notice.kind === 'kerney'
+    ? 'text-[#ffd100] slug-jackpot'
+    : notice.kind === 'rosas'
+      ? 'text-[#ff86ae]'
+      : 'text-[#fff6dc]/45'
+  return (
+    <div className="join-slug my-1 flex items-center gap-2.5 px-4">
+      <span className="h-px flex-1 bg-[#fff6dc]/12" />
+      <span className={`shrink-0 text-[11px] leading-4 ${tone}`}>{notice.text}</span>
+      <span className="h-px flex-1 bg-[#fff6dc]/12" />
+    </div>
+  )
 }
 
 export default function App() {
@@ -28,11 +99,76 @@ export default function App() {
   const [entryComplete, setEntryComplete] = useState(false)
   const [sendCoolingDown, setSendCoolingDown] = useState(false)
   const completeEntry = useCallback(() => setEntryComplete(true), [])
+  useEffect(() => { setHoveredCipher(null) }, [chat.messages.length])
   // Chinese shows first, English swaps in — the motion is what says 'button'
   useEffect(() => {
     const tick = window.setInterval(() => setLabelEnglish((on) => !on), 2600)
     return () => window.clearInterval(tick)
   }, [])
+  // The newest message that is not yours. Its cluster keeps a permanent react
+  // button; every other cluster only shows one on hover.
+  const lastIncomingId = (() => {
+    for (let n = chat.messages.length - 1; n >= 0; n -= 1) {
+      if (chat.messages[n].sender !== chat.username) return chat.messages[n].id
+    }
+    return null
+  })()
+
+  // MEMBERS arrives as a full roster, so a join is a set difference. The very
+  // first roster is the room as it already was — announcing it would be noise.
+  const [notices, setNotices] = useState([])
+  const [freshMembers, setFreshMembers] = useState([])
+  const [frameFlash, setFrameFlash] = useState(false)
+  const seenMembersRef = useRef(null)
+
+  useEffect(() => {
+    // Roster frames arrive before and during our own join. Baseline is the
+    // first roster that contains us — everything up to that point is the room
+    // as it already was, and announcing it is noise.
+    const inRoster = chat.username && chat.members.includes(chat.username)
+    if (!inRoster) return
+    const previous = seenMembersRef.current
+    seenMembersRef.current = chat.members
+    if (previous === null) return
+
+    const arrivals = chat.members.filter((member) => !previous.includes(member))
+    if (!arrivals.length) return
+
+    const anchor = chat.messages.length
+    setNotices((current) => [
+      ...current,
+      ...arrivals.map((name) => {
+        const slug = joinSlug(name)
+        return { id: `join:${name}:${anchor}:${current.length}`, anchor, name, ...slug }
+      }),
+    ])
+
+    // The joiner does not get the fanfare about themselves — only the slug.
+    const others = arrivals.filter((name) => name !== chat.username)
+    if (!others.length) return
+
+    setFreshMembers((current) => [...current, ...others])
+    window.setTimeout(() => {
+      setFreshMembers((current) => current.filter((name) => !others.includes(name)))
+    }, 1900)
+
+    if (others.some(isKerney)) {
+      setFrameFlash(true)
+      window.setTimeout(() => setFrameFlash(false), 1600)
+    }
+  }, [chat.members])
+
+  const noticesAt = (index) => notices.filter((notice) => notice.anchor === index)
+
+  // A draft that has sat unsent for two seconds gets a nudge.
+  const [sendNudge, setSendNudge] = useState(false)
+  useEffect(() => {
+    setSendNudge(false)
+    if (!draft.trim()) return
+    const wake = window.setTimeout(() => setSendNudge(true), 2000)
+    return () => window.clearTimeout(wake)
+  }, [draft])
+
   const draftLength = [...draft].length
   const charactersOver = Math.max(0, draftLength - MAX_MESSAGE_LENGTH)
   const [showNewMessages, setShowNewMessages] = useState(false)
@@ -42,13 +178,21 @@ export default function App() {
   const [revealsLeft, setRevealsLeft] = useState(2)
   const [allCipher, setAllCipher] = useState(false)
   const [hoveredCipher, setHoveredCipher] = useState(null)
+  const [blockedFlash, setBlockedFlash] = useState(null)
+  const flashBlocked = (key) => {
+    setBlockedFlash(key)
+    window.setTimeout(() => setBlockedFlash((current) => (current === key ? null : current)), 480)
+  }
   const [labelEnglish, setLabelEnglish] = useState(false)
   const [ciphered, setCiphered] = useState(() => new Set())
-  const flipCipher = (id) => setCiphered((current) => {
-    const next = new Set(current)
-    next.has(id) ? next.delete(id) : next.add(id)
-    return next
-  })
+  const flipCipher = (id) => {
+    setOpenReactions(null)
+    setCiphered((current) => {
+      const next = new Set(current)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
   const [revealed, setRevealed] = useState(() => new Set())
 
   function scrollToNewest(behavior = 'smooth') {
@@ -97,42 +241,43 @@ export default function App() {
     <main onClick={() => { setOpenReactions(null); setStickerPickerOpen(false); setEmojiPickerOpen(false) }} className="aurora grid-glow relative min-h-screen overflow-hidden app-main">
       <RsaMatrixBackground />
       <div className="scanlines pointer-events-none fixed inset-0 z-40 opacity-20" />
-      <PropagandaFrame />                                {/* ← add this line */}
+      <PropagandaFrame flash={frameFlash} />
       {!entryComplete && <JoinModal connectionStatus={chat.status} serverError={chat.error} onJoin={chat.join} onClearError={chat.clearError} onComplete={completeEntry} />}
 <div className="pointer-events-none absolute inset-x-24 top-0 h-px bg-gradient-to-r from-transparent via-yellow-400 to-transparent" />
       <section className="chat-shell chat-shell-fit relative z-10 mx-auto flex max-w-6xl overflow-hidden rounded-[1.75rem] border border-slate-300/10 shadow-[0_30px_100px_rgba(0,0,0,.55)] backdrop-blur-xl">
         <div className="pointer-events-none absolute inset-x-24 top-0 h-px bg-gradient-to-r from-transparent via-red-400/60 to-transparent" />
-        <aside className="chat-sidebar hidden w-64 shrink-0 border-r border-slate-300/8 p-5 md:flex md:flex-col">
-          <div className="flex items-center gap-3 text-white"><span className="relative grid h-9 w-9 place-items-center rounded-xl border border-red-400/20 bg-red-500/10"><Fingerprint className="text-[#ffe873]" size={20} /><span className="status-pulse absolute inset-0 rounded-xl border border-red-400/30" /></span><div><span className="block font-semibold tracking-tight">RSA Cha-Cha</span><span className="block text-[10px] uppercase tracking-[.2em] text-[#f4e4c1]/45">Secure channel</span></div></div>
-          <div className="mt-10 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#f4e4c1]/55"><Users size={14} /> In the room</div>
-          <div className="mt-4 space-y-2">
-            <div className="flex items-center gap-3 rounded-xl border border-yellow-400/10 bg-yellow-400/[.035] px-2 py-2 text-sm text-[#f4e4c1]/90">
-              <span className="h-2 w-2 rounded-full bg-yellow-400 shadow-[0_0_9px_#67e8f9]" />kerney
+        <aside className="chat-sidebar hidden w-64 shrink-0 p-5 md:flex md:flex-col">
+          <div className="flex items-center gap-3">
+            <span className="grid h-9 w-9 shrink-0 place-items-center border-2 border-[#ffd100] bg-[#4a0410]"><Fingerprint className="text-[#ffd100]" size={19} /></span>
+            <span className="text-base font-bold tracking-tight text-[#fff6dc]">RSA Cha-Cha</span>
+          </div>
+          <div className="mt-7 space-y-1">
+            <div className="flex items-center gap-3 border-l-[3px] border-[#ffd100] bg-[#ffd100]/10 px-3 py-2 text-sm font-bold text-[#ffd100]">
+              <span className="h-2 w-2 shrink-0 bg-[#ffd100]" />kerney
             </div>
             {(chat.members.length ? chat.members : chat.username ? [chat.username] : []).map((member) => (
-              <div key={`member:${member}`} className="group flex items-center gap-3 rounded-xl border border-transparent px-2 py-2 text-sm text-[#f4e4c1]/85transition hover:border-white/5 hover:bg-white/[.025]">
-                <span className="h-2 w-2 rounded-full bg-red-500 shadow-[0_0_9px_#34d399]" />{member}{member === chat.username && <span className="text-[#f4e4c1]/45">you</span>}
+              <div key={`member:${member}`} className={`group flex items-center gap-3 border-l-[3px] border-transparent px-3 py-2 text-sm text-[#fff6dc] transition hover:border-[#ffd100]/50 hover:bg-[#ffd100]/[.07] ${freshMembers.includes(member) ? 'member-pop' : ''}`}>
+                <span className="h-2 w-2 shrink-0 bg-[#ffd100]/70" />{member}{member === chat.username && <span className="ml-auto text-[10px] uppercase tracking-wider text-[#ffd100]/70">you</span>}
               </div>
             ))}
           </div>
           <div className="mt-auto space-y-3">
-            <button type="button" tabIndex={showNewMessages ? 0 : -1} aria-hidden={!showNewMessages} onClick={() => scrollToNewest()} className={`flex w-full items-center justify-center gap-2 rounded-xl border border-amber-200/20 bg-red-500 px-3 py-2.5 text-xs font-semibold text-yellow-100 transition-all duration-300 hover:bg-red-400 ${showNewMessages ? 'new-message-badge opacity-100' : 'pointer-events-none translate-y-2 opacity-0'}`}><ArrowDown size={14} /> View new messages</button>
-            <div className="rounded-2xl border border-red-400/10 bg-red-500/[.035] p-4">
-            </div>
+            <button type="button" tabIndex={showNewMessages ? 0 : -1} aria-hidden={!showNewMessages} onClick={() => scrollToNewest()} className={`flex w-full items-center justify-center gap-2 border-2 border-[#4a0410] bg-[#ffd100] px-3 py-2.5 text-xs font-bold text-[#4a0410] shadow-[0_3px_0_#4a0410] transition-all duration-300 hover:-translate-y-0.5 ${showNewMessages ? 'new-message-badge opacity-100' : 'pointer-events-none translate-y-2 opacity-0'}`}><ArrowDown size={14} /> View new messages</button>
+
           </div>
         </aside>
 
         <div className="chat-pane relative flex min-w-0 flex-1 flex-col">
           <header className="chat-header flex h-20 items-center justify-between border-b border-slate-300/8 px-5 sm:px-7">
-               <div className="flex items-center gap-3"><h2 className="font-semibold tracking-tight text-white">加密房间 · Encrypted Room</h2></div>
+              <RollingBanner />
             <button
               type="button"
-              onClick={(event) => { event.stopPropagation(); setAllCipher((on) => !on); setCiphered(new Set()) }}
+              onClick={(event) => { event.stopPropagation(); setAllCipher((on) => !on); setCiphered(new Set()); setOpenReactions(null); flashBlocked('ALL') }}
               aria-pressed={allCipher}
               aria-label={allCipher ? 'Show plaintext' : 'Show ciphertext'}
               className={`cipher-switch group/switch flex shrink-0 items-center gap-2 rounded-full border-2 px-3 py-1.5 text-xs font-bold transition active:translate-y-px ${allCipher
                 ? 'border-[#4a0410] bg-[#ffd100] text-[#4a0410] shadow-[0_3px_0_#4a0410] hover:shadow-[0_5px_0_#4a0410] hover:-translate-y-0.5'
-                : 'border-[#ffd100] bg-[#4a0410] text-[#ffe873] shadow-[0_3px_0_#8a0a1c] hover:shadow-[0_5px_0_#8a0a1c] hover:-translate-y-0.5'}`}
+                : 'border-[#4a0410] bg-[#fff6dc] text-[#4a0410] shadow-[0_3px_0_#4a0410] hover:bg-white hover:shadow-[0_5px_0_#4a0410] hover:-translate-y-0.5'}`}
             >
               {allCipher ? <EyeOff size={14} /> : <Eye size={14} />}
               <span className={`switch-label ${labelEnglish ? '' : 'han'}`} key={`${allCipher}-${labelEnglish}`}>
@@ -146,9 +291,14 @@ export default function App() {
 
           <div ref={messageListRef} onScroll={handleMessageScroll} className="flex flex-1 flex-col gap-1 overflow-y-auto scroll-smooth p-5 sm:p-7">
             {chat.messages.length === 0 && (
-            <div className="m-auto max-w-sm text-center"><LockKeyhole className="mx-auto text-[#ffd100]/40" size={38} /><h3 className="mt-4 font-medium text-[#f4e4c1]/85">房间安静 · The room is quiet</h3></div>
+            <div className="m-auto flex max-w-sm flex-col items-center gap-3 px-6 text-center">
+              <span className="grid h-14 w-14 place-items-center border-2 border-[#ffd100]/50 bg-[#26040a]"><LockKeyhole className="text-[#ffd100]" size={26} /></span>
+              <p className="han text-sm text-[#ffd100]">房间安静</p>
+              <p className="text-sm text-[#fff6dc]/70">The room is quiet</p>
+            </div>
             )}
             {chat.messages.map((message, i) => {
+              const leading = noticesAt(i)
               const own = message.sender === chat.username
               const prev = chat.messages[i - 1]
               const next = chat.messages[i + 1]
@@ -160,12 +310,19 @@ export default function App() {
               const { sticker, caption } = parseStickerMessage(message.plaintext)
               // Messenger rule: the react affordance is always visible on the last
               // incoming bubble of a group. Everywhere else it stays hover-only.
-              const pinnedReact = !own && !message.isAi && lastOfGroup
-              const showCipher = !message.isAi && Boolean(message.cipher)
+              const wordCount = (message.plaintext || '').trim().split(/\s+/).filter(Boolean).length
+              // long incoming walls of text: no flip, and they never spend a reveal
+              const tooLong = !own && !message.isAi && wordCount > 25
+              const revealing = !own && !revealed.has(message.id) && revealsLeft > 0 && !tooLong
+              const cipherLocked = tooLong || revealing
+              const blocked = blockedFlash === message.id || (blockedFlash === 'ALL' && revealing)
+              const showCipher = Boolean(message.cipher) && !revealing
                 && ((allCipher !== ciphered.has(message.id)) || hoveredCipher === message.id)
               return (
-                <article key={message.id}
-  className={`group/message w-fit max-w-[min(84%,30rem)] sm:max-w-[min(70%,38rem)] ${firstOfGroup ? 'mt-4 first:mt-0' : ''} ${own ? 'message-enter-right ml-auto' : 'message-enter-left mr-auto'}`}>
+                <Fragment key={message.id}>
+                {leading.map((notice) => <JoinSlug key={notice.id} notice={notice} />)}
+                <article
+  className={`group/message w-fit max-w-[min(84%,30rem)] sm:max-w-[min(70%,38rem)] ${firstOfGroup ? 'mt-2.5 first:mt-0' : ''} ${own ? 'message-enter-right ml-auto' : 'message-enter-left mr-auto'}`}>
                 {firstOfGroup && (
                   <p className={`mb-1 flex items-center gap-1.5 text-xs font-bold text-[#ffd100]/85 ${own ? 'justify-end text-right' : ''}`}>
                     {own ? 'You' : message.sender}
@@ -177,23 +334,23 @@ export default function App() {
                       {caption && <p className={`mx-1 mt-1 whitespace-pre-wrap break-words [overflow-wrap:anywhere] rounded-xl px-3 py-2.5 text-sm leading-6 ${own ? 'bg-red-500 text-yellow-100' : 'bg-white/[.06] text-[#f4e4c1]/90'}`}>{caption}</p>}
                     </div>
                   ) : (<div
-  role={message.isAi ? undefined : 'button'}
-  tabIndex={message.isAi ? undefined : 0}
-  onClick={(event) => { if (message.isAi) return; event.stopPropagation(); flipCipher(message.id) }}
-  onPointerEnter={(event) => { if (!message.isAi && event.pointerType === 'mouse') setHoveredCipher(message.id) }}
+  role="button"
+  tabIndex={0}
+  onClick={(event) => { event.stopPropagation(); if (cipherLocked) { flashBlocked(message.id); return } flipCipher(message.id) }}
+  onPointerEnter={(event) => { if (cipherLocked) return; if (event.pointerType === 'mouse') setHoveredCipher(message.id) }}
   onPointerLeave={() => setHoveredCipher((current) => (current === message.id ? null : current))}
-  onKeyDown={(event) => { if (message.isAi) return; if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); flipCipher(message.id) } }}
-  className={`bubble-arrive max-w-full whitespace-pre-wrap break-words [overflow-wrap:anywhere] border px-4 py-3 text-sm leading-6 shadow-lg ${message.isAi ? '' : 'cursor-pointer select-none'}
+  onKeyDown={(event) => { if (event.key !== 'Enter' && event.key !== ' ') return; event.preventDefault(); if (cipherLocked) { flashBlocked(message.id); return } flipCipher(message.id) }}
+  className={`bubble-arrive max-w-full whitespace-pre-wrap break-words [overflow-wrap:anywhere] border px-4 py-3 text-sm leading-6 shadow-lg select-none ${cipherLocked ? 'cursor-default' : 'cursor-pointer'} ${blocked ? 'cipher-blocked' : ''}
   ${own
-    ? `border-[#ffd100]/40 bg-gradient-to-br from-[#e01b33] to-[#8a0a1c] text-[#fff6dc] shadow-black/50
+    ? `border-[#ff8fa3]/35 bg-[#9e0c22] text-white shadow-black/40
        rounded-l-2xl ${firstOfGroup ? 'rounded-tr-2xl' : 'rounded-tr-md'} ${lastOfGroup ? 'rounded-br-md' : 'rounded-br-md'}`
     : message.isAi
-      ? `border-[#ffd100]/45 bg-[#3d0510]/92 text-[#fff6dc]
+      ? `border-[#ffd100]/55 bg-[#2e0912] text-[#fff6dc] shadow-black/40
          rounded-r-2xl ${firstOfGroup ? 'rounded-tl-2xl' : 'rounded-tl-md'} rounded-bl-md`
-      : `border-[#ffd100]/35 bg-[#26040a]/92 text-[#fff6dc] shadow-black/50 backdrop-blur-md
+      : `border-[#ffd100]/22 bg-[#2e0912] text-[#fff6dc] shadow-black/40
          rounded-r-2xl ${firstOfGroup ? 'rounded-tl-2xl' : 'rounded-tl-md'} rounded-bl-md`}`}>{showCipher
   ? <span className="cipher-text block break-all font-mono text-[11px] leading-4">{message.cipher}</span>
-  : !own && !revealed.has(message.id) && revealsLeft > 0
+  : revealing
     ? <CipherReveal
         text={message.plaintext}
         cipher={message.cipher}
@@ -204,13 +361,13 @@ export default function App() {
       />
     : message.plaintext}</div>
                   )}
-                  <div className={`relative flex items-center gap-1.5 ${lastOfGroup || reactions.length || reactionTrayOpen ? 'mt-1.5 h-8' : 'h-0'} ${own ? 'justify-end' : ''}`}>
+                  <div className={`relative flex items-center gap-1.5 ${lastOfGroup || reactions.length || reactionTrayOpen ? 'mt-1 h-7' : 'h-0'} ${own ? 'justify-end' : ''}`}>
                     {visibleReactions.map(([emoji, people]) => (
                       <button type="button" key={emoji} onClick={(event) => { event.stopPropagation(); chat.react(message.id, emoji) }} title={people.join(', ')} className={`reaction-pop react-pill flex h-7 items-center gap-1 rounded-full border px-2 text-xs ${people.includes(chat.username) ? 'border-[#ffd100] bg-[#ffd100]/20 text-[#ffd100]' : 'border-[#ffd100]/30 bg-[#3d0510] text-[#fff6dc] hover:border-[#ffd100] hover:bg-[#ffd100]/15'}`}><span>{emoji}</span><span className="text-[10px] text-[#ffd100]/80">{people.length}</span></button>
                     ))}
-                    <button type="button" onClick={(event) => { event.stopPropagation(); setOpenReactions(reactionTrayOpen ? null : message.id) }} className={`react-nub grid h-8 w-8 shrink-0 place-items-center rounded-full border border-[#ffd100]/35 bg-[#3d0510] text-[#ffd100]/70 shadow-lg shadow-black/50 hover:border-[#ffd100] hover:bg-[#ffd100] hover:text-[#4a0410] ${pinnedReact || reactions.length || reactionTrayOpen
+                    <button type="button" onClick={(event) => { event.stopPropagation(); setOpenReactions(reactionTrayOpen ? null : message.id) }} className={`react-nub react-idle grid h-7 w-7 shrink-0 place-items-center rounded-full border border-[#ffd100]/35 bg-[#3d0510] text-[#ffd100]/70 shadow-lg shadow-black/50 hover:border-[#ffd100] hover:bg-[#ffd100] hover:text-[#4a0410] ${reactions.length || reactionTrayOpen || message.id === lastIncomingId
                       ? 'opacity-100'
-                      : 'opacity-0 group-hover/message:opacity-100 focus:opacity-100'}`} aria-label="View and add reactions"><SmilePlus size={15} /></button>
+                      : 'opacity-0 group-hover/message:opacity-100 focus-visible:opacity-100'}`} aria-label="View and add reactions"><SmilePlus size={14} /></button>
                     {reactionTrayOpen && (
                       <div onClick={(event) => event.stopPropagation()} className={`reaction-pop absolute bottom-9 z-30 min-w-52 rounded-2xl border border-amber-200/10 bg-[#1b181f]/95 p-2 shadow-2xl shadow-black/50 backdrop-blur-xl ${own ? 'right-0' : 'left-0'}`}>
                         {reactions.length > 0 && <p className="px-2 pb-1.5 text-[10px] font-semibold uppercase tracking-[.16em] text-[#f4e4c1]/45">Reactions</p>}
@@ -221,9 +378,13 @@ export default function App() {
                     )}
                   </div>
                 </article>
+                </Fragment>
               )
             })}
-            {chat.kerneyThinking && <div className="message-enter-left max-w-[70%]"><p className="mb-1 text-xs font-bold text-[#ffd100]/85">kerney</p><div className="flex w-fit gap-1 rounded-2xl rounded-bl-md border border-yellow-400/20 bg-red-950/30 px-4 py-3"><span className="status-pulse h-1.5 w-1.5 rounded-full bg-yellow-400" /><span className="status-pulse h-1.5 w-1.5 rounded-full bg-yellow-400 [animation-delay:150ms]" /><span className="status-pulse h-1.5 w-1.5 rounded-full bg-yellow-400 [animation-delay:300ms]" /></div></div>}
+            {notices.filter((notice) => notice.anchor >= chat.messages.length).map((notice) => (
+              <JoinSlug key={notice.id} notice={notice} />
+            ))}
+            {chat.kerneyThinking && <div className="message-enter-left mt-4 w-fit max-w-[70%]"><p className="mb-1 text-xs font-bold text-[#ffd100]/85">kerney</p><div className="flex w-fit items-center gap-[5px] rounded-full border border-[#ffd100]/45 bg-[#26040a]/92 px-3.5 py-2.5 shadow-lg shadow-black/50"><span className="typing-dot h-[7px] w-[7px] rounded-full bg-[#ffd100]" /><span className="typing-dot h-[7px] w-[7px] rounded-full bg-[#ffd100]" /><span className="typing-dot h-[7px] w-[7px] rounded-full bg-[#ffd100]" /></div></div>}
           </div>
 
           <button type="button" tabIndex={showNewMessages ? 0 : -1} aria-hidden={!showNewMessages} onClick={() => scrollToNewest()} className={`absolute bottom-[5.7rem] left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-amber-200/25 bg-red-500 px-4 py-2 text-xs font-semibold text-yellow-100 shadow-xl shadow-black/40 transition-all duration-300 hover:bg-red-400 md:hidden ${showNewMessages ? 'new-message-badge opacity-100' : 'pointer-events-none translate-y-2 opacity-0'}`}><ArrowDown size={14} /> New messages</button>
@@ -245,11 +406,14 @@ export default function App() {
                 </div>
               </div>
             )}
-            <div className="flex items-end gap-1.5 rounded-[1.75rem] border-2 border-[#ffd100]/25 bg-black/35 p-1.5 shadow-inner shadow-black/40 transition-all duration-300 hover:border-[#ffd100]/45 focus-within:border-[#ffd100]/70 focus-within:bg-black/45 focus-within:shadow-[0_0_28px_rgba(255,209,0,.12)]">
-              <button type="button" onClick={(event) => { event.stopPropagation(); setStickerPickerOpen((open) => !open); setEmojiPickerOpen(false); setOpenReactions(null) }} disabled={!joined} aria-label="Open image picker" className={`grid h-10 w-10 shrink-0 place-items-center rounded-full transition duration-150 hover:scale-110 disabled:opacity-30 disabled:hover:scale-100 ${stickerPickerOpen ? 'bg-[#ffd100] text-[#4a0410]' : 'text-[#ffd100]/70 hover:bg-[#ffd100]/12 hover:text-[#ffd100]'}`}><ImagePlus size={19} /></button>
-              <button type="button" onClick={(event) => { event.stopPropagation(); setEmojiPickerOpen((open) => !open); setStickerPickerOpen(false); setOpenReactions(null) }} disabled={!joined} aria-label="Open emoji picker" className={`grid h-10 w-10 shrink-0 place-items-center rounded-full transition duration-150 hover:scale-110 disabled:opacity-30 disabled:hover:scale-100 ${emojiPickerOpen ? 'bg-[#ffd100] text-[#4a0410]' : 'text-[#ffd100]/70 hover:bg-[#ffd100]/12 hover:text-[#ffd100]'}`}><Smile size={19} /></button>
-              <textarea value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) send(event) }} disabled={!joined} rows="1" wrap="soft" placeholder="Message the room…" aria-invalid={charactersOver > 0} className={`max-h-32 min-h-10 min-w-0 flex-1 resize-none overflow-y-auto whitespace-pre-wrap break-words [overflow-wrap:anywhere] bg-transparent px-2 py-2.5 text-sm outline-none placeholder:text-[#ffd100]/50 ${charactersOver ? 'text-rose-300' : 'text-[#fff6dc]'}`} />
-              <button disabled={!joined || !draft.trim() || charactersOver > 0 || sendCoolingDown} aria-label="Send message" className={`group grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#ffd100] text-[#4a0410] shadow-[0_3px_0_#8a0a1c] transition duration-150 hover:-translate-y-0.5 hover:shadow-[0_5px_0_#8a0a1c] active:translate-y-px active:shadow-[0_1px_0_#8a0a1c] disabled:opacity-25 disabled:shadow-none disabled:hover:translate-y-0 ${sendPulse ? 'send-burst' : ''}`}><Send className="transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" size={18} /></button>
+            <div className="flex items-end gap-1.5 rounded-[1.75rem] border-2 border-[#ffd100]/50 bg-[#1a0206] p-1.5 shadow-inner shadow-black/60 transition-all duration-300 hover:border-[#ffd100]/75 focus-within:border-[#ffd100] focus-within:bg-[#120104] focus-within:shadow-[0_0_28px_rgba(255,209,0,.12)]">
+              <button type="button" onClick={(event) => { event.stopPropagation(); setStickerPickerOpen((open) => !open); setEmojiPickerOpen(false); setOpenReactions(null) }} disabled={!joined} aria-label="Open image picker" className={`grid h-10 w-10 shrink-0 place-items-center rounded-full transition duration-150 hover:scale-110 disabled:opacity-30 disabled:hover:scale-100 ${stickerPickerOpen ? 'bg-[#ffd100] text-[#4a0410]' : 'text-[#ffd100] hover:bg-[#ffd100] hover:text-[#4a0410]'}`}><ImagePlus size={19} /></button>
+              <button type="button" onClick={(event) => { event.stopPropagation(); setEmojiPickerOpen((open) => !open); setStickerPickerOpen(false); setOpenReactions(null) }} disabled={!joined} aria-label="Open emoji picker" className={`react-idle grid h-10 w-10 shrink-0 place-items-center rounded-full transition duration-150 hover:scale-110 disabled:opacity-30 disabled:hover:scale-100 ${emojiPickerOpen ? 'bg-[#ffd100] text-[#4a0410]' : 'text-[#ffd100] hover:bg-[#ffd100] hover:text-[#4a0410]'}`}><Smile size={19} /></button>
+              <div className="relative min-w-0 flex-1">
+              {!draft && joined && <RollingPlaceholder />}
+              <textarea value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) send(event) }} disabled={!joined} rows="1" wrap="soft" placeholder="" aria-invalid={charactersOver > 0} className={`relative z-10 max-h-32 min-h-10 w-full resize-none overflow-y-auto whitespace-pre-wrap break-words [overflow-wrap:anywhere] bg-transparent px-2 py-2 text-sm leading-5 outline-none placeholder:text-[#ffd100]/50 ${charactersOver ? 'text-rose-300' : 'text-white'}`} />
+              </div>
+              <button disabled={!joined || !draft.trim() || charactersOver > 0 || sendCoolingDown} aria-label="Send message" className={`group grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#ffd100] text-[#4a0410] shadow-[0_3px_0_#8a0a1c] transition duration-150 hover:-translate-y-0.5 hover:shadow-[0_5px_0_#8a0a1c] active:translate-y-px active:shadow-[0_1px_0_#8a0a1c] disabled:bg-[#5c3a06] disabled:text-[#ffd100]/55 disabled:shadow-none disabled:hover:translate-y-0 ${sendPulse ? 'send-burst' : sendNudge ? 'send-nudge' : ''}`}><Send className="transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" size={18} /></button>
             </div>
             <div className={`flex justify-end px-3 text-[10px] ${charactersOver > 0 || draftLength >= 450 || /\bkerney\b/i.test(draft) ? 'mt-1.5 h-4' : 'h-0'}`}>
               {charactersOver > 0 ? <span className="font-medium text-rose-400">Remove {charactersOver} character{charactersOver === 1 ? '' : 's'} to send</span> : /\bkerney\b/i.test(draft) ? <span className="text-yellow-400/60">Careful what you wish for.</span> : draftLength >= 450 ? <span className={draftLength >= 490 ? 'text-[#ffe873]' : 'text-[#f4e4c1]/45'}>{draftLength}/{MAX_MESSAGE_LENGTH}</span> : null}

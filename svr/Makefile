@@ -11,7 +11,7 @@ DEPS  = $(OBJS:.o=.d)
 HDRS  = $(wildcard *.h)
 
 # from raincheck
-server: $(OBJS)
+server.out: $(OBJS)
 	@$(CXX) $(CCFLAGS) $^ -o $@ $(LDLIBS)
 	@echo "linked -> ./svr"
 
@@ -35,7 +35,7 @@ check:
 	else echo "^^^ fix these before pushing."; exit 1; fi
 
 clean:
-	@rm -f *.o *.d server
+	@rm -f *.o *.d *.out
 	@echo "cleaned"
 
 .PHONY: check clean

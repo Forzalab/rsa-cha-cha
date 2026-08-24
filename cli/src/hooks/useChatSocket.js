@@ -89,7 +89,7 @@ export function useChatSocket(url = import.meta.env.VITE_WS_URL || DEFAULT_URL) 
           setKerneyThinking(false)
           setMessages((current) => current.some((item) => item.id === message.content?.message_id) ? current : [...current, {
             id: message.content?.message_id ?? newId(), sender: 'kerney',
-            plaintext: message.content?.text ?? '', cipher: '', reactions: {}, isAi: true,
+            plaintext: message.content?.text ?? '', cipher: encryptText(message.content?.text ?? ''), reactions: {}, isAi: true,
           }])
         } else if (message.request.startsWith('ERR_')) {
           const text = errorText(message.request)

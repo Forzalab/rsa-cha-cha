@@ -77,26 +77,26 @@ export function JoinModal({ connectionStatus, serverError, onJoin, onClearError,
         <div className="flex items-center justify-between border-b-2 border-[#ffd100]/50 pb-4">
           <div>
             <p className="han text-[11px] text-[#ffd100]">身份审查中</p>
-            <h2 className="mt-1 text-xl font-bold text-[#f4e4c1]">Establishing secure vibes</h2>
+            <h2 className="mt-1 text-xl font-bold text-[#fff6dc]">Establishing secure vibes</h2>
           </div>
           <div className="relative grid h-11 w-11 place-items-center border-2 border-[#ffd100] text-[#ffd100]">
             <RadioTower size={19} />
-            <span className="loading-orbit absolute inset-[-5px] rounded-full border border-transparent border-t-[#ffd100]" />
+            <span className="scan-square absolute inset-[-6px] border-2 border-transparent border-t-[#ffd100] border-l-[#ffd100]" />
           </div>
         </div>
 
         <div className="min-h-64 space-y-3 py-6 font-mono text-sm">
           {SECURITY_CHECKS.slice(0, checksVisible).map((check, index) => (
-            <div key={check} className="loading-line flex items-center gap-3 text-[#f4e4c1]/75">
-              <Check size={14} className={index === checksVisible - 1 && phase === 'loading' ? 'text-[#ffe873]' : 'text-[#ffd100]'} />
+            <div key={check} className="loading-line flex items-start gap-3 text-[#fff6dc]">
+              <Check size={14} className={`mt-1 shrink-0 ${index === checksVisible - 1 && phase === 'loading' ? 'text-[#ffe873]' : 'text-[#ffd100]'}`} />
               <span>{check}</span>
-              <span className="han ml-auto text-[10px] text-[#ffd100]/70">合格</span>
+              <span className="han ml-auto shrink-0 whitespace-nowrap text-[10px] text-[#ffd100]">合格</span>
             </div>
           ))}
           {phase === 'granted' || phase === 'exit' ? (
             <div className="stamp-in mt-6 border-4 border-[#ffd100] bg-[#ffd100]/10 px-4 py-3 text-center">
               <span className="han block text-lg text-[#ffe873]">批准通行</span>
-              <span className="block text-sm font-bold text-[#f4e4c1]">CLEARANCE GRANTED (probably)</span>
+              <span className="block text-sm font-bold text-[#fff6dc]">CLEARANCE GRANTED (probably)</span>
             </div>
           ) : (
             <span className="inline-block h-4 w-2 animate-pulse bg-[#ffd100]" />
