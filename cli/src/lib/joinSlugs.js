@@ -20,13 +20,13 @@ const GENERIC = [
 ]
 
 const KERNEY = [
-  '★ LEADER HAS JOINED — ALL RISE ★',
-  '★ SURPRISE INSPECTION — PRAISE HIS GLORY ★',
+  '★ THE SUPREME LEADER HAS JOINED — ALL RISE ★',
+  '★ KERNEY HAS ARRIVED — PRAISE HIS GLORY ★',
 ]
 
 const ROSAS = [
-  '⚠ plaintext sympathiser {name} has entered — brace the semicolons',
-  '⚠ VSCODE DESTROYER {name} sighted. Remain vigilant',
+  '⚠ .vscode spreader {name} invaded our space — brace your nvim configs',
+  '⚠ NVIM DESTROYER {name} sighted. Remain vigilant for .vscode',
 ]
 
 // Deliberately loose. A missed match costs the best moment of the demo; a
