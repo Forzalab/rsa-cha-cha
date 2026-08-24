@@ -116,9 +116,10 @@ inline URLString Utility::get_visualization_url(const cpp_int& p, const cpp_int&
 string apiKey = "YOUR_API_KEY";
 string userName = "YOUR_USERNAME";
 
-bridges::Bridges myBridges(1, userName, apiKey);
+bridges::Bridges bridges(1, userName, apiKey);
 
-   bridges::datastructure::GraphAdjList<string, string, string> graph;
+
+bridges::datastructure::GraphAdjList<string, string, int> graph;
 
     graph.addVertex("p", p.str());
     graph.addVertex("q", q.str());
@@ -127,18 +128,22 @@ bridges::Bridges myBridges(1, userName, apiKey);
     graph.addVertex("e", e.str());
     graph.addVertex("d", d.str());
 
-    graph.addEdge("p", "N", "p*q");
-    graph.addEdge("q", "N", "p*q");
-    graph.addEdge("p", "totient", "(p-1)(q-1)");
-    graph.addEdge("q", "totient", "(p-1)(q-1)");
-    graph.addEdge("totient", "e", "coprime to totient");
-    graph.addEdge("e", "d", "modular inverse mod totient");
+    graph.addEdge("p", "N", 1);
+    graph.addEdge("q", "N", 1);
+    graph.addEdge("p", "totient", 1);
+    graph.addEdge("q", "totient", 1);
+    graph.addEdge("totient", "e", 1);
+    graph.addEdge("e", "d", 1);
 
-myBridges.setDataStructure(graph);
-myBridges.visualize();
 
-string url = myBridges.getVisualizeURL();
-	return url;
+bridges.setDataStructure(&graph);
+bridges.visualize();
+
+string url =  "https://assignments.bridgesuncc.org/assignments/" +
+        std::to_string(1) +
+        "/" +
+        userName;
+	return URLString(url);
 }
 
 #endif
