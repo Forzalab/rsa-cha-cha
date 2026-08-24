@@ -124,7 +124,7 @@ export default function App() {
 
         <div className="chat-pane relative flex min-w-0 flex-1 flex-col">
           <header className="chat-header flex h-20 items-center justify-between border-b border-slate-300/8 px-5 sm:px-7">
-               <div className="flex items-center gap-3"><h2 className="font-semibold tracking-tight text-white">加密房间 · Encrypted Room</h2></div>
+               <div className="flex items-center gap-3"><h2 className="font-semibold tracking-tight text-[#ffd100]">加密房间 · Encrypted Room</h2></div>
             <button
               type="button"
               onClick={(event) => { event.stopPropagation(); setAllCipher((on) => !on); setCiphered(new Set()) }}
@@ -161,7 +161,7 @@ export default function App() {
               // Messenger rule: the react affordance is always visible on the last
               // incoming bubble of a group. Everywhere else it stays hover-only.
               const pinnedReact = !own && !message.isAi && lastOfGroup
-              const showCipher = !message.isAi && Boolean(message.cipher)
+              const showCipher = Boolean(message.cipher)
                 && ((allCipher !== ciphered.has(message.id)) || hoveredCipher === message.id)
               return (
                 <article key={message.id}
@@ -177,18 +177,18 @@ export default function App() {
                       {caption && <p className={`mx-1 mt-1 whitespace-pre-wrap break-words [overflow-wrap:anywhere] rounded-xl px-3 py-2.5 text-sm leading-6 ${own ? 'bg-red-500 text-yellow-100' : 'bg-white/[.06] text-[#f4e4c1]/90'}`}>{caption}</p>}
                     </div>
                   ) : (<div
-  role={message.isAi ? undefined : 'button'}
-  tabIndex={message.isAi ? undefined : 0}
-  onClick={(event) => { if (message.isAi) return; event.stopPropagation(); flipCipher(message.id) }}
-  onPointerEnter={(event) => { if (!message.isAi && event.pointerType === 'mouse') setHoveredCipher(message.id) }}
+  role="button"
+  tabIndex={0}
+  onClick={(event) => { event.stopPropagation(); flipCipher(message.id) }}
+  onPointerEnter={(event) => { if (event.pointerType === 'mouse') setHoveredCipher(message.id) }}
   onPointerLeave={() => setHoveredCipher((current) => (current === message.id ? null : current))}
-  onKeyDown={(event) => { if (message.isAi) return; if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); flipCipher(message.id) } }}
-  className={`bubble-arrive max-w-full whitespace-pre-wrap break-words [overflow-wrap:anywhere] border px-4 py-3 text-sm leading-6 shadow-lg ${message.isAi ? '' : 'cursor-pointer select-none'}
+  onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); flipCipher(message.id) } }}
+  className={`bubble-arrive max-w-full whitespace-pre-wrap break-words [overflow-wrap:anywhere] border px-4 py-3 text-sm leading-6 shadow-lg cursor-pointer select-none
   ${own
     ? `border-[#ffd100]/40 bg-gradient-to-br from-[#e01b33] to-[#8a0a1c] text-[#fff6dc] shadow-black/50
        rounded-l-2xl ${firstOfGroup ? 'rounded-tr-2xl' : 'rounded-tr-md'} ${lastOfGroup ? 'rounded-br-md' : 'rounded-br-md'}`
     : message.isAi
-      ? `border-[#ffd100]/45 bg-[#3d0510]/92 text-[#fff6dc]
+      ? `border-[#ffd100]/60 bg-[#26040a]/92 text-[#fff6dc] shadow-black/50 backdrop-blur-md
          rounded-r-2xl ${firstOfGroup ? 'rounded-tl-2xl' : 'rounded-tl-md'} rounded-bl-md`
       : `border-[#ffd100]/35 bg-[#26040a]/92 text-[#fff6dc] shadow-black/50 backdrop-blur-md
          rounded-r-2xl ${firstOfGroup ? 'rounded-tl-2xl' : 'rounded-tl-md'} rounded-bl-md`}`}>{showCipher
