@@ -6,17 +6,22 @@
 // No crypto in here. This file moves strings and nothing else.
 
 #include <boost/asio/io_context.hpp>
+#include <boost/asio/post.hpp>
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/beast/core.hpp>
 #include <boost/beast/websocket.hpp>
 #include <nlohmann/json.hpp>
+#include "Gemini.h"
 
+#include <algorithm>
+#include <cctype>
 #include <deque>
 #include <chrono>
 #include <iostream>
 #include <map>
 #include <memory>
 #include <string>
+#include <thread>
 #include <utility>
 
 namespace bo = boost::asio;
@@ -55,6 +60,8 @@ class Session : public std::enable_shared_from_this<Session> {
     void set_userid(std::string id) { userid_ = std::move(id); }
     bool joined() const { return !userid_.empty(); }
     bool allow_send(const json& msg);
+    bool allow_ai();
+    void post_ai_reply(GeminiReply reply, std::string message_id);
 
    private:
     void on_accept(bb::error_code ec);
@@ -71,6 +78,7 @@ class Session : public std::enable_shared_from_this<Session> {
     std::deque<std::chrono::steady_clock::time_point> recent_sends_;
     std::chrono::steady_clock::time_point last_logical_send_{};
     std::string last_event_id_;
+    std::chrono::steady_clock::time_point last_ai_request_{};
 };
 
 
@@ -99,11 +107,13 @@ class Hub {
 
     void route(const std::shared_ptr<Session>& from, const std::string& frame);
     void leave(const std::string& who, const Session* session);
+    void broadcast_ai(const GeminiReply& reply, const std::string& message_id);
 
    private:
     void do_join(const std::shared_ptr<Session>&, const json&);
     void do_lookup(const std::shared_ptr<Session>&, const json&);
     void do_send(const std::shared_ptr<Session>&, const json&);
+    void do_ai(const std::shared_ptr<Session>&, const json&);
     void announce_members();
 
     std::map<std::string, Entry> dir_;
@@ -183,6 +193,20 @@ inline bool Session::allow_send(const json& msg) {
     return true;
 }
 
+inline bool Session::allow_ai() {
+    const auto now = std::chrono::steady_clock::now();
+    if (last_ai_request_ != std::chrono::steady_clock::time_point{} &&
+        now - last_ai_request_ < std::chrono::seconds(4)) return false;
+    last_ai_request_ = now;
+    return true;
+}
+
+inline void Session::post_ai_reply(GeminiReply reply, std::string message_id) {
+    bo::post(ws_.get_executor(), [self = shared_from_this(), reply = std::move(reply), message_id = std::move(message_id)] {
+        self->hub_.broadcast_ai(reply, message_id);
+    });
+}
+
 inline void Session::do_write() {
     ws_.async_write(bo::buffer(out_.front()),
                     bb::bind_front_handler(&Session::on_write, shared_from_this()));
@@ -221,9 +245,48 @@ inline void Hub::route(const std::shared_ptr<Session>& from, const std::string& 
             from->send(envelope("SERVER", from->userid(), "ERR_RATE_LIMIT"));
         else
             do_send(from, msg);
+    } else if (request == "AI_KERNEY") {
+        do_ai(from, msg);
     } else {
         from->send(envelope("SERVER", from->userid(), "ERR_UNSPC"));
     }
+}
+
+inline void Hub::do_ai(const std::shared_ptr<Session>& from, const json& msg) {
+    const json content = msg.value("content", json::object());
+    const std::string prompt = content.value("prompt", "");
+    const std::string message_id = content.value("message_id", "");
+    std::string lowered = prompt;
+    std::transform(lowered.begin(), lowered.end(), lowered.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    if (prompt.empty() || prompt.size() > 2000 || lowered.find("kerney") == std::string::npos) {
+        from->send(envelope("SERVER", from->userid(), "ERR_BAD_AI_REQUEST"));
+        return;
+    }
+    if (!gemini_configured()) {
+        from->send(envelope("SERVER", from->userid(), "ERR_AI_UNAVAILABLE"));
+        return;
+    }
+    if (!from->allow_ai()) {
+        from->send(envelope("SERVER", from->userid(), "ERR_AI_RATE_LIMIT"));
+        return;
+    }
+
+    for (const auto& [name, entry] : dir_)
+        if (auto session = entry.session.lock())
+            session->send(envelope("kerney", "ROOM", "AI_THINKING", {{"message_id", message_id}}));
+
+    std::thread([from, username = from->userid(), prompt, message_id] {
+        from->post_ai_reply(ask_kerney(username, prompt), message_id);
+    }).detach();
+}
+
+inline void Hub::broadcast_ai(const GeminiReply& reply, const std::string& message_id) {
+    const json message = reply.ok
+        ? envelope("kerney", "ROOM", "AI_DELIVER", {{"message_id", "ai-" + message_id}, {"text", reply.text}})
+        : envelope("SERVER", "ROOM", "ERR_AI_UNAVAILABLE", {{"detail", reply.text}});
+    for (const auto& [name, entry] : dir_)
+        if (auto session = entry.session.lock()) session->send(message);
 }
 
 inline void Hub::do_join(const std::shared_ptr<Session>& from, const json& msg) {

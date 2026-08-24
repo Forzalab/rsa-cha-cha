@@ -87,8 +87,11 @@ export default function App() {
           <div className="flex items-center gap-3 text-white"><span className="relative grid h-9 w-9 place-items-center rounded-xl border border-amber-300/20 bg-amber-400/10"><Fingerprint className="text-amber-300" size={20} /><span className="status-pulse absolute inset-0 rounded-xl border border-amber-300/30" /></span><div><span className="block font-semibold tracking-tight">RSA Cha-Cha</span><span className="block text-[10px] uppercase tracking-[.2em] text-slate-600">Secure channel</span></div></div>
           <div className="mt-10 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-500"><Users size={14} /> In the room</div>
           <div className="mt-4 space-y-2">
+            <div className="flex items-center gap-3 rounded-xl border border-cyan-300/10 bg-cyan-300/[.035] px-2 py-2 text-sm text-slate-200">
+              <span className="h-2 w-2 rounded-full bg-cyan-300 shadow-[0_0_9px_#67e8f9]" />kerney
+            </div>
             {(chat.members.length ? chat.members : chat.username ? [chat.username] : []).map((member) => (
-              <div key={member} className="group flex items-center gap-3 rounded-xl border border-transparent px-2 py-2 text-sm text-slate-300 transition hover:border-white/5 hover:bg-white/[.025]">
+              <div key={`member:${member}`} className="group flex items-center gap-3 rounded-xl border border-transparent px-2 py-2 text-sm text-slate-300 transition hover:border-white/5 hover:bg-white/[.025]">
                 <span className="h-2 w-2 rounded-full bg-amber-400 shadow-[0_0_9px_#34d399]" />{member}{member === chat.username && <span className="text-slate-600">you</span>}
               </div>
             ))}
@@ -104,7 +107,7 @@ export default function App() {
 
         <div className="chat-pane relative flex min-w-0 flex-1 flex-col">
           <header className="chat-header flex h-20 items-center justify-between border-b border-slate-300/8 px-5 sm:px-7">
-            <div className="flex items-center gap-3"><span className="relative grid h-10 w-10 place-items-center rounded-xl border border-cyan-300/10 bg-cyan-300/5 text-cyan-300"><Radio size={18} /><span className="status-pulse absolute inset-0 rounded-xl border border-cyan-300/20" /></span><div><h2 className="font-semibold tracking-tight text-white">Encrypted room</h2><p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500"><Activity size={11} className="text-amber-400" />{joined ? `${chat.members.length} online · ${chat.username}` : 'Waiting to join'}</p></div></div>
+            <div className="flex items-center gap-3"><span className="relative grid h-10 w-10 place-items-center rounded-xl border border-cyan-300/10 bg-cyan-300/5 text-cyan-300"><Radio size={18} /><span className="status-pulse absolute inset-0 rounded-xl border border-cyan-300/20" /></span><div><h2 className="font-semibold tracking-tight text-white">Encrypted room</h2><p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500"><Activity size={11} className="text-amber-400" />{joined ? `${chat.members.length + 1} online · ${chat.username}` : 'Waiting to join'}</p></div></div>
             <span className="flex items-center gap-2 rounded-full border border-amber-400/20 bg-amber-400/5 px-3 py-1.5 text-xs text-amber-300 shadow-inner shadow-amber-300/5"> End-to-end RSA</span>
           </header>
 
@@ -120,14 +123,14 @@ export default function App() {
               const { sticker, caption } = parseStickerMessage(message.plaintext)
               return (
                 <article key={message.id} className={`group/message max-w-[82%] sm:max-w-[70%] ${own ? 'message-enter-right ml-auto' : 'message-enter-left'}`}>
-                  <p className={`mb-1 text-xs text-slate-500 ${own ? 'text-right' : ''}`}>{own ? 'You' : message.sender}</p>
+                  <p className={`mb-1 flex items-center gap-1.5 text-xs text-slate-500 ${own ? 'justify-end text-right' : ''}`}>{own ? 'You' : message.sender}</p>
                   {sticker ? (
                     <div className="sticker-pop max-w-sm overflow-hidden rounded-2xl border border-white/10 bg-black/20 p-1.5 shadow-2xl shadow-black/30">
                       <StickerImage sticker={sticker} />
                       {caption && <p className={`mx-1 mt-1 whitespace-pre-wrap break-words [overflow-wrap:anywhere] rounded-xl px-3 py-2.5 text-sm leading-6 ${own ? 'bg-amber-400 text-amber-950' : 'bg-white/[.06] text-slate-200'}`}>{caption}</p>}
                     </div>
                   ) : (
-                    <div className={`bubble-arrive max-w-full whitespace-pre-wrap break-words [overflow-wrap:anywhere] rounded-2xl border px-4 py-3 text-sm leading-6 shadow-lg ${own ? 'rounded-br-md border-amber-200/20 bg-gradient-to-br from-amber-300 to-orange-400 text-amber-950 shadow-amber-950/20' : 'rounded-bl-md border-slate-300/10 bg-slate-700/25 text-slate-100 shadow-black/20 backdrop-blur-md'}`}>{message.plaintext}</div>
+                    <div className={`bubble-arrive max-w-full whitespace-pre-wrap break-words [overflow-wrap:anywhere] rounded-2xl border px-4 py-3 text-sm leading-6 shadow-lg ${own ? 'rounded-br-md border-amber-200/20 bg-gradient-to-br from-amber-300 to-orange-400 text-amber-950 shadow-amber-950/20' : message.isAi ? 'rounded-bl-md border-cyan-300/20 bg-cyan-950/30 text-cyan-50 shadow-cyan-950/20' : 'rounded-bl-md border-slate-300/10 bg-slate-700/25 text-slate-100 shadow-black/20 backdrop-blur-md'}`}>{message.plaintext}</div>
                   )}
                   <div className={`relative mt-2 flex h-7 items-center gap-1.5 ${own ? 'justify-end' : ''}`}>
                     {visibleReactions.map(([emoji, people]) => (
@@ -143,10 +146,11 @@ export default function App() {
                       </div>
                     )}
                   </div>
-                  <details className={`group mt-1.5 text-[11px] text-slate-600 ${own ? 'text-right' : ''}`}><summary className="cursor-pointer list-none transition hover:text-amber-400">⌁ View ciphertext</summary><p className="cipher-text mt-1 max-w-lg break-all font-mono leading-4">{message.cipher}</p></details>
+                  {!message.isAi && <details className={`group mt-1.5 text-[11px] text-slate-600 ${own ? 'text-right' : ''}`}><summary className="cursor-pointer list-none transition hover:text-amber-400">⌁ View ciphertext</summary><p className="cipher-text mt-1 max-w-lg break-all font-mono leading-4">{message.cipher}</p></details>}
                 </article>
               )
             })}
+            {chat.kerneyThinking && <div className="message-enter-left max-w-[70%]"><p className="mb-1 text-xs text-slate-500">kerney</p><div className="flex w-fit gap-1 rounded-2xl rounded-bl-md border border-cyan-300/20 bg-cyan-950/30 px-4 py-3"><span className="status-pulse h-1.5 w-1.5 rounded-full bg-cyan-300" /><span className="status-pulse h-1.5 w-1.5 rounded-full bg-cyan-300 [animation-delay:150ms]" /><span className="status-pulse h-1.5 w-1.5 rounded-full bg-cyan-300 [animation-delay:300ms]" /></div></div>}
           </div>
 
           <button type="button" tabIndex={showNewMessages ? 0 : -1} aria-hidden={!showNewMessages} onClick={() => scrollToNewest()} className={`absolute bottom-[5.7rem] left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-amber-200/25 bg-amber-400 px-4 py-2 text-xs font-semibold text-amber-950 shadow-xl shadow-black/40 transition-all duration-300 hover:bg-amber-300 md:hidden ${showNewMessages ? 'new-message-badge opacity-100' : 'pointer-events-none translate-y-2 opacity-0'}`}><ArrowDown size={14} /> New messages</button>
@@ -175,7 +179,7 @@ export default function App() {
               <button disabled={!joined || !draft.trim() || charactersOver > 0 || sendCoolingDown} aria-label="Send message" className={`group grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br from-amber-300 to-orange-400 text-amber-950 shadow-lg shadow-amber-950/30 transition duration-200 hover:-translate-y-0.5 hover:shadow-amber-400/20 active:translate-y-0 disabled:opacity-30 ${sendPulse ? 'send-burst' : ''}`}><Send className="transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" size={18} /></button>
             </div>
             <div className="mt-1.5 flex h-4 justify-end px-2 text-[10px]">
-              {charactersOver > 0 ? <span className="font-medium text-rose-400">Remove {charactersOver} character{charactersOver === 1 ? '' : 's'} to send</span> : draftLength >= 450 ? <span className={draftLength >= 490 ? 'text-amber-300' : 'text-slate-600'}>{draftLength}/{MAX_MESSAGE_LENGTH}</span> : null}
+              {charactersOver > 0 ? <span className="font-medium text-rose-400">Remove {charactersOver} character{charactersOver === 1 ? '' : 's'} to send</span> : /\bkerney\b/i.test(draft) ? <span className="text-cyan-300/60">Careful what you wish for.</span> : draftLength >= 450 ? <span className={draftLength >= 490 ? 'text-amber-300' : 'text-slate-600'}>{draftLength}/{MAX_MESSAGE_LENGTH}</span> : null}
             </div>
           </form>
         </div>
