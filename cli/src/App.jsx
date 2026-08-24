@@ -34,6 +34,15 @@ export default function App() {
     const tick = window.setInterval(() => setLabelEnglish((on) => !on), 2600)
     return () => window.clearInterval(tick)
   }, [])
+  // The newest message that is not yours. Its cluster keeps a permanent react
+  // button; every other cluster only shows one on hover.
+  const lastIncomingId = (() => {
+    for (let n = chat.messages.length - 1; n >= 0; n -= 1) {
+      if (chat.messages[n].sender !== chat.username) return chat.messages[n].id
+    }
+    return null
+  })()
+
   const draftLength = [...draft].length
   const charactersOver = Math.max(0, draftLength - MAX_MESSAGE_LENGTH)
   const [showNewMessages, setShowNewMessages] = useState(false)
@@ -169,7 +178,6 @@ export default function App() {
               const { sticker, caption } = parseStickerMessage(message.plaintext)
               // Messenger rule: the react affordance is always visible on the last
               // incoming bubble of a group. Everywhere else it stays hover-only.
-              const pinnedReact = !own && !message.isAi && lastOfGroup
               const wordCount = (message.plaintext || '').trim().split(/\s+/).filter(Boolean).length
               // long incoming walls of text: no flip, and they never spend a reveal
               const tooLong = !own && !message.isAi && wordCount > 25
@@ -180,7 +188,7 @@ export default function App() {
                 && ((allCipher !== ciphered.has(message.id)) || hoveredCipher === message.id)
               return (
                 <article key={message.id}
-  className={`group/message w-fit max-w-[min(84%,30rem)] sm:max-w-[min(70%,38rem)] ${firstOfGroup ? 'mt-4 first:mt-0' : ''} ${own ? 'message-enter-right ml-auto' : 'message-enter-left mr-auto'}`}>
+  className={`group/message w-fit max-w-[min(84%,30rem)] sm:max-w-[min(70%,38rem)] ${firstOfGroup ? 'mt-2.5 first:mt-0' : ''} ${own ? 'message-enter-right ml-auto' : 'message-enter-left mr-auto'}`}>
                 {firstOfGroup && (
                   <p className={`mb-1 flex items-center gap-1.5 text-xs font-bold text-[#ffd100]/85 ${own ? 'justify-end text-right' : ''}`}>
                     {own ? 'You' : message.sender}
@@ -219,13 +227,13 @@ export default function App() {
       />
     : message.plaintext}</div>
                   )}
-                  <div className={`relative flex items-center gap-1.5 ${lastOfGroup || reactions.length || reactionTrayOpen ? 'mt-1.5 h-8' : 'h-0'} ${own ? 'justify-end' : ''}`}>
+                  <div className={`relative flex items-center gap-1.5 ${lastOfGroup || reactions.length || reactionTrayOpen ? 'mt-1 h-7' : 'h-0'} ${own ? 'justify-end' : ''}`}>
                     {visibleReactions.map(([emoji, people]) => (
                       <button type="button" key={emoji} onClick={(event) => { event.stopPropagation(); chat.react(message.id, emoji) }} title={people.join(', ')} className={`reaction-pop react-pill flex h-7 items-center gap-1 rounded-full border px-2 text-xs ${people.includes(chat.username) ? 'border-[#ffd100] bg-[#ffd100]/20 text-[#ffd100]' : 'border-[#ffd100]/30 bg-[#3d0510] text-[#fff6dc] hover:border-[#ffd100] hover:bg-[#ffd100]/15'}`}><span>{emoji}</span><span className="text-[10px] text-[#ffd100]/80">{people.length}</span></button>
                     ))}
-                    <button type="button" onClick={(event) => { event.stopPropagation(); setOpenReactions(reactionTrayOpen ? null : message.id) }} className={`react-nub grid h-8 w-8 shrink-0 place-items-center rounded-full border border-[#ffd100]/35 bg-[#3d0510] text-[#ffd100]/70 shadow-lg shadow-black/50 hover:border-[#ffd100] hover:bg-[#ffd100] hover:text-[#4a0410] ${pinnedReact || reactions.length || reactionTrayOpen
+                    <button type="button" onClick={(event) => { event.stopPropagation(); setOpenReactions(reactionTrayOpen ? null : message.id) }} className={`react-nub grid h-7 w-7 shrink-0 place-items-center rounded-full border border-[#ffd100]/35 bg-[#3d0510] text-[#ffd100]/70 shadow-lg shadow-black/50 hover:border-[#ffd100] hover:bg-[#ffd100] hover:text-[#4a0410] ${reactions.length || reactionTrayOpen || message.id === lastIncomingId
                       ? 'opacity-100'
-                      : 'opacity-0 group-hover/message:opacity-100 focus:opacity-100'}`} aria-label="View and add reactions"><SmilePlus size={15} /></button>
+                      : 'opacity-0 group-hover/message:opacity-100 focus-visible:opacity-100'}`} aria-label="View and add reactions"><SmilePlus size={14} /></button>
                     {reactionTrayOpen && (
                       <div onClick={(event) => event.stopPropagation()} className={`reaction-pop absolute bottom-9 z-30 min-w-52 rounded-2xl border border-amber-200/10 bg-[#1b181f]/95 p-2 shadow-2xl shadow-black/50 backdrop-blur-xl ${own ? 'right-0' : 'left-0'}`}>
                         {reactions.length > 0 && <p className="px-2 pb-1.5 text-[10px] font-semibold uppercase tracking-[.16em] text-[#f4e4c1]/45">Reactions</p>}
