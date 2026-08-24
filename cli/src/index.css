@@ -163,6 +163,34 @@ summary, [role="button"] { cursor: pointer; }
 }
 
 /* the serial-number gag plate */
+/* ─── react nub: hover should feel like a thing you want to press ─── */
+.react-nub {
+  transition: background-color .16s ease, border-color .16s ease, color .16s ease,
+              box-shadow .18s ease, transform .18s cubic-bezier(.2, 1.6, .35, 1);
+}
+.react-nub:hover {
+  animation: react-bob .62s ease-in-out infinite;
+  box-shadow: 0 7px 20px rgba(255, 209, 0, .38), 0 0 0 3px rgba(255, 209, 0, .16);
+}
+.react-nub:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(255, 209, 0, .55);
+}
+.react-nub:active {
+  animation: none;
+  transform: translateY(2px) scale(.9);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, .5);
+}
+@keyframes react-bob {
+  0%, 100% { transform: translateY(-2px) scale(1.1) rotate(-4deg); }
+  50%      { transform: translateY(-7px) scale(1.16) rotate(4deg); }
+}
+
+/* reaction pills get a smaller share of the same energy */
+.react-pill { transition: transform .16s cubic-bezier(.2, 1.5, .35, 1), background-color .16s, border-color .16s; }
+.react-pill:hover { transform: translateY(-3px) scale(1.06); }
+.react-pill:active { transform: translateY(1px) scale(.96); }
+
 /* ─── cipher switch: the motion is what reads as "button" ─── */
 .cipher-switch { position: relative; cursor: pointer; }
 .cipher-switch .switch-label {
@@ -257,8 +285,8 @@ summary, [role="button"] { cursor: pointer; }
 .chat-pane {
   background:
     repeating-conic-gradient(from 0deg at 50% 0%,
-      rgba(255, 209, 0, .045) 0deg 2deg, transparent 2deg 8deg),
-    linear-gradient(180deg, rgba(74, 4, 16, .82), rgba(45, 3, 10, .9));
+      rgba(255, 209, 0, .028) 0deg 2deg, transparent 2deg 8deg),
+    linear-gradient(180deg, rgba(46, 3, 11, .94), rgba(20, 1, 5, .97));
 }
 
 .chat-header {
