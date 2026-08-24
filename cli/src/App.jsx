@@ -19,15 +19,47 @@ function StickerImage({ sticker, compact = false }) {
 }
 
 function HammerSickle({ className = '', size = 48 }) {
+  // Geometry from the public-domain Wikimedia file (Hammer_and_sickle.svg).
+  // Red backing rect dropped and the gold recoloured to currentColor, so the
+  // mark inherits whatever the surrounding text colour is.
   return (
-    <svg viewBox="0 0 64 64" width={size} height={size} className={className} fill="none"
-         stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round"
-         aria-hidden="true">
-      {/* sickle: blade arc sweeping up from the handle, opening to the left */}
-      <path d="M16 52C44 46 53 30 49 17c-1-3-4-4-6-2-2 2-1 5 1 7 4 5 3 14-6 20-6 4-14 6-22 10Z" />
-      {/* hammer: head and haft crossing the arc */}
-      <path d="M16 52 41 27" />
-      <path d="M35 14 52 31l-7 7-17-17Z" />
+    <svg viewBox="0 0 550 550" width={size} height={size} className={className}
+         xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+<defs>
+      <mask
+      maskUnits="userSpaceOnUse"
+      id="mask941">
+      <rect fill="#ffffff"
+      width="48"
+      height="48"
+      x="-240"
+      y="780"
+      transform="rotate(-45)" />
+      </mask>
+      <mask
+      maskUnits="userSpaceOnUse"
+      id="mask945">
+      <rect
+      y="780"
+      x="-704"
+      height="48"
+      width="48" fill="#ffffff"
+      transform="rotate(-45)" />
+      </mask>
+      <mask
+      maskUnits="userSpaceOnUse"
+      id="mask2036">
+      <path fill="#ffffff"
+      d="M 144.24978,777.81746 53.740115,687.30779 202.35943,663.7698 Z" />
+      </mask>
+      </defs>
+<g fill="currentColor"
+      transform="translate(18.000002,-824.0001)">
+      <path fill="currentColor"
+      d="m 157.54301,922.36336 -16.97149,16.9707 -45.256019,45.2539 -56.570993,56.57034 62.227502,62.2246 56.571,-56.5684 299.82842,299.8124 a 32.001491,31.999993 0 0 0 45.25601,0 32.001491,31.999993 0 0 0 0,-45.2539 l -299.82646,-299.8143 16.9715,-16.97074 50.91448,-50.91015 z" />
+      <path fill="currentColor"
+      d="m 255.989,844.0001 c 0,0 168.00781,127.99997 168.00783,256 C 423.99684,1164 367.99425,1236 271.98975,1236 c -64.00296,0 -104.24119,-47.7637 -104.24119,-47.7637 l -11.31302,11.3125 a 16.000745,15.999996 0 0 0 -22.62801,0 16.000745,15.999996 0 0 0 -2.47863,3.2227 32.001491,31.999993 0 0 0 -31.464359,8.0918 32.001491,31.999993 0 0 0 -9.330512,21.5449 C 65.101725,1246.1605 22.969246,1272.9834 4.2643862,1308 l 0.029298,0.029 A 32.001491,31.999993 0 0 0 4.2643862,1340 32.001491,31.999993 0 0 0 47.979313,1351.7129 c 35.025561,-18.708 61.854737,-60.8518 75.605087,-86.2813 a 32.001491,31.999993 0 0 0 21.53616,-9.3144 32.001491,31.999993 0 0 0 7.93201,-13.2012 c 24.51647,23.0544 71.44493,57.084 134.93792,57.084 96.00451,0 200.00932,-72 200.00932,-199.9999 0,-160.00002 -232.01081,-256 -232.01081,-256 z" />
+      </g>
     </svg>
   )
 }
@@ -306,7 +338,7 @@ export default function App() {
           <div ref={messageListRef} onScroll={handleMessageScroll} className="flex flex-1 flex-col gap-1 overflow-y-auto scroll-smooth p-5 sm:p-7">
             {chat.messages.length === 0 && (
             <div className="m-auto flex max-w-sm flex-col items-center gap-3 px-6 text-center">
-              <HammerSickle className="text-white/22" size={52} />
+              <HammerSickle className="text-white/20" size={58} />
               <p className="han text-sm text-white/45">房间安静</p>
               <p className="text-sm text-white/35">The room is quiet</p>
             </div>
@@ -421,7 +453,7 @@ export default function App() {
               </div>
             )}
             <div className="flex items-end gap-1.5 rounded-[1.75rem] border-2 border-[#ffd100]/50 bg-[#1a0206] p-1.5 shadow-inner shadow-black/60 transition-all duration-300 hover:border-[#ffd100]/75 focus-within:border-[#ffd100] focus-within:bg-[#120104] focus-within:shadow-[0_0_28px_rgba(255,209,0,.12)]">
-              <button type="button" onClick={(event) => { event.stopPropagation(); setStickerPickerOpen((open) => !open); setEmojiPickerOpen(false); setOpenReactions(null) }} disabled={!joined} aria-label="Open image picker" className={`grid h-10 w-10 shrink-0 place-items-center rounded-full transition duration-150 hover:scale-110 disabled:opacity-30 disabled:hover:scale-100 ${stickerPickerOpen ? 'bg-[#ffd100] text-[#4a0410]' : 'text-[#ffd100] hover:bg-[#ffd100] hover:text-[#4a0410]'}`}><ImagePlus size={19} /></button>
+              <button type="button" onClick={(event) => { event.stopPropagation(); setStickerPickerOpen((open) => !open); setEmojiPickerOpen(false); setOpenReactions(null) }} disabled={!joined} aria-label="Open image picker" className={`react-idle react-idle--offset grid h-10 w-10 shrink-0 place-items-center rounded-full transition duration-150 hover:scale-110 disabled:opacity-30 disabled:hover:scale-100 ${stickerPickerOpen ? 'bg-[#ffd100] text-[#4a0410]' : 'text-[#ffd100] hover:bg-[#ffd100] hover:text-[#4a0410]'}`}><ImagePlus size={19} /></button>
               <button type="button" onClick={(event) => { event.stopPropagation(); setEmojiPickerOpen((open) => !open); setStickerPickerOpen(false); setOpenReactions(null) }} disabled={!joined} aria-label="Open emoji picker" className={`react-idle grid h-10 w-10 shrink-0 place-items-center rounded-full transition duration-150 hover:scale-110 disabled:opacity-30 disabled:hover:scale-100 ${emojiPickerOpen ? 'bg-[#ffd100] text-[#4a0410]' : 'text-[#ffd100] hover:bg-[#ffd100] hover:text-[#4a0410]'}`}><Smile size={19} /></button>
               <div className="relative min-w-0 flex-1">
               {!draft && joined && <RollingPlaceholder />}

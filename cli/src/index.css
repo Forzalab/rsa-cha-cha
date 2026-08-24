@@ -209,6 +209,8 @@ summary, [role="button"] { cursor: pointer; }
   95%           { box-shadow: 0 0 0 0 rgba(255, 209, 0, 0); }
 }
 .react-idle:hover { animation: none; }
+/* half a cycle behind, so the composer never blinks both buttons at once */
+.react-idle--offset { animation-delay: 2.25s; }
 
 /* ─── unsent draft nudge ─── */
 .send-nudge { animation: send-nudge 2.4s ease-in-out infinite; }
