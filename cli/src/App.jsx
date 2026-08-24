@@ -118,12 +118,12 @@ export default function App() {
             {chat.messages.length === 0 && (
             <div className="m-auto max-w-sm text-center"><LockKeyhole className="mx-auto text-[#ffd100]/40" size={38} /><h3 className="mt-4 font-medium text-[#f4e4c1]/85">房间安静 · The room is quiet</h3></div>
             )}
-            {chat.messages.map((message) => {
+            {chat.messages.map((message, i) => {
               const own = message.sender === chat.username
               const prev = chat.messages[i - 1]
               const next = chat.messages[i + 1]
               const firstOfGroup = !prev || prev.sender !== message.sender || prev.isAi !== message.isAi
-              const lastOfGroup  = !next || next.sender
+              const lastOfGroup  = !next || next.sender !== message.sender || next.isAi !== message.isAi
               const reactions = Object.entries(message.reactions ?? {})
               const visibleReactions = reactions.slice(0, 3)
               const reactionTrayOpen = openReactions === message.id
