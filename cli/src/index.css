@@ -265,8 +265,8 @@ summary, [role="button"] { cursor: pointer; }
 .prop-freeze .prop-star { animation-play-state: paused; }
 .prop-freeze .prop-strip { filter: grayscale(.92) brightness(.72); transition: filter .28s ease-out; }
 
-.prop-flash .prop-strip { animation: strip-flash .2s steps(1, end) 3; }
-.prop-flash .prop-star  { animation: prop-star-spin .45s linear infinite, strip-flash .2s steps(1, end) 3; }
+.prop-flash .prop-strip { animation: strip-flash .34s steps(2, end) 3; }
+.prop-flash .prop-star  { animation: prop-star-spin .45s linear infinite, strip-flash .34s steps(2, end) 3; }
 @keyframes strip-flash {
   0%, 49%   { filter: none; }
   50%, 100% { filter: brightness(2.8) saturate(1.6); }
@@ -583,3 +583,4 @@ summary, [role="button"] { cursor: pointer; }
   }
   .prop-track { animation: none !important; }
 }
+
