@@ -1,8 +1,8 @@
 CXX      = g++
 CCFLAGS  = -Iinclude -I. \
-           -std=c++26 -g \
-           -Wall -Wfatal-errors -Wno-sign-compare \
-           -D_GLIBCXX_DEBUG -fsanitize=undefined -fsanitize=address
+           -std=c++26 \
+           -Wfatal-errors -Wno-sign-compare \
+           -fsanitize=undefined -fsanitize=address
 LDLIBS   = -lcurl -lpthread
 
 SRCS  = $(wildcard *.cc)

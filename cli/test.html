@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<!-- Throwaway. Two of these open = a two-user chat. No build step, no deps.
+     Open the file directly, or serve cli/ on 6767. Delete once McKay's UI lands. -->
+<meta charset="utf-8">
+<title>rsa-cha-cha bridge test</title>
+<style>
+  body { font: 14px ui-monospace, monospace; margin: 2rem; max-width: 60rem; }
+  input, button { font: inherit; padding: .3rem .5rem; }
+  #log { white-space: pre-wrap; border: 1px solid #ccc; padding: .75rem;
+         height: 22rem; overflow-y: auto; margin-top: 1rem; }
+  .tx { color: #06c; } .rx { color: #080; } .er { color: #c00; } .sy { color: #888; }
+  .row { margin: .35rem 0; }
+</style>
+
+<div class="row">
+  ws:// <input id="url" value="csci4x.com:6868" size="24">
+  as <input id="me" value="tony" size="10">
+  <button id="go">connect + JOIN</button>
+</div>
+<div class="row">
+  to <input id="to" value="mckay" size="10">
+  <input id="msg" value="jdhdjd3737 下回合：他大概率粘贴文件后构建 dbrjeje ©®®®©©©%©©©© àæä" size="40">
+  <button id="send">SEND</button>
+  <button id="look">LOOKUP</button>
+  <button id="junk">send garbage</button>
+</div>
+<div id="log"></div>
+
+<script>
+let ws = null;
+const $ = id => document.getElementById(id);
+const log = (cls, s) => {
+  const d = document.createElement('div');
+  d.className = cls; d.textContent = s;
+  $('log').append(d); $('log').scrollTop = $('log').scrollHeight;
+};
+const me = () => $('me').value.trim();
+
+// Every number rides as a quoted string. All of them, so nobody keeps a
+// mental table of which fields are quoted.
+function tx(obj) {
+  if (!ws || ws.readyState !== 1) return log('er', 'not connected');
+  const s = JSON.stringify(obj);
+  log('tx', '-> ' + s);
+  ws.send(s);
+}
+
+$('go').onclick = () => {
+  if (ws) ws.close();
+  ws = new WebSocket('ws://' + $('url').value.trim());
+  ws.onopen = () => {
+    log('sy', 'socket open');
+    tx({ sender: me(), receiver: 'SERVER', request: 'JOIN',
+         content: { key_value: '7', key_mod: '143', key_type: 'pub' },
+         content_sig: '1394' });
+  };
+  ws.onmessage = e => {
+    log('rx', '<- ' + e.data);
+    const m = JSON.parse(e.data);
+    if (m.request === 'DELIVER')
+      log('sy', `   ${m.sender} says: ${m.content.cipher}  [sig ${m.content_sig ?? '-'}]`);
+  };
+  ws.onclose = () => log('sy', 'socket closed');
+  ws.onerror = () => log('er', 'socket error');
+};
+
+$('send').onclick = () =>
+  tx({ sender: me(), receiver: $('to').value.trim(), request: 'SEND',
+       content: { cipher: $('msg').value }, content_sig: '1301' });
+
+$('look').onclick = () =>
+  tx({ sender: me(), receiver: 'SERVER', request: 'LOOKUP',
+       content: { who: $('to').value.trim() } });
+
+// Should come back ERR_BAD_JSON with the socket still open.
+$('junk').onclick = () => {
+  if (!ws || ws.readyState !== 1) return log('er', 'not connected');
+  log('tx', '-> { not json');
+  ws.send('{ not json');
+};
+</script>

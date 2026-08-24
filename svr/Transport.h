@@ -11,7 +11,7 @@
 #include <boost/beast/core.hpp>
 #include <boost/beast/websocket.hpp>
 #include <nlohmann/json.hpp>
-#include "Gemini.h"
+#include "LLM.h"
 
 #include <algorithm>
 #include <cctype>
