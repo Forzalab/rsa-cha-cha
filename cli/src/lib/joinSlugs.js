@@ -2,7 +2,7 @@
 // No real party, state, leader, or event appears here — the target is always
 // plaintext, semicolons, or the .vscode directory.
 
-import { isRosas } from './rosasMode.js'
+
 
 const GENERIC = [
   '{name} has passed political review and been admitted',
@@ -29,8 +29,17 @@ const ROSAS = [
   '⚠ VSCODE DESTROYER {name} sighted. Remain vigilant',
 ]
 
+// Deliberately loose. A missed match costs the best moment of the demo; a
+// false positive costs one silly banner. The asymmetry is not close.
+const KERNEY_RE = /(k[e3]rn|kearn|curn|prof|instructor|teacher|lecturer|\bbill\b|\bwm\b|\bdr\b|sensei|senpai)/i
+const ROSAS_RE = /(r[o0]s[ae]s?|r[o0]z[ae]s?|rsas|rosss|\brose\b)/i
+
 export function isKerney(name) {
-  return (name ?? '').trim().toLocaleLowerCase('en-US') === 'kerney'
+  return KERNEY_RE.test((name ?? '').trim())
+}
+
+export function isRosasName(name) {
+  return ROSAS_RE.test((name ?? '').trim())
 }
 
 let lastGeneric = -1
@@ -39,7 +48,7 @@ export function joinSlug(name) {
   if (isKerney(name)) {
     return { kind: 'kerney', text: KERNEY[Math.floor(Math.random() * KERNEY.length)] }
   }
-  if (isRosas(name)) {
+  if (isRosasName(name)) {
     const line = ROSAS[Math.floor(Math.random() * ROSAS.length)]
     return { kind: 'rosas', text: line.replace('{name}', name) }
   }
