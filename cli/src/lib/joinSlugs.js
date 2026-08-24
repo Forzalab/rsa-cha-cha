@@ -5,28 +5,28 @@
 import { isRosas } from './rosasMode.js'
 
 const GENERIC = [
-  '热烈欢迎 {name} 同志抵达前线！',
-  '{name} 同志已通过政治审查 · 予以放行',
-  '一名野生的 {name} 出现了！',
-  '{name} 已光荣加入本信道 · 请出示公钥',
-  '{name} 同志携带质数入场 · 群众鼓掌',
-  '经上级批准 · {name} 现予登记在册',
-  '{name} 同志刚刚删除了 .vscode 目录 · 特此表扬',
-  '{name} 已当众宣誓：绝不上传明文',
-  '{name} 抵达 · 第 6868 号信道人数 +1',
-  '{name} 通过了欧几里得考核 · 准予入场',
-  '{name} 同志自带分号入场 · 编译器表示满意',
-  '{name} 已缴纳模运算公粮 · 光荣上线',
+  '{name} has passed political review and been admitted',
+  'A wild {name} has appeared',
+  '{name} joined the channel — public key on file',
+  '{name} arrived carrying a prime',
+  '{name} was entered into the register by order of the committee',
+  '{name} deleted the .vscode directory and was commended',
+  '{name} swore never to upload plaintext',
+  '{name} joined — channel 6868 population +1',
+  '{name} passed the Euclid inspection',
+  '{name} brought their own semicolons',
+  '{name} delivered the modular arithmetic quota',
+  '{name} reported for duty',
 ]
 
 const KERNEY = [
-  '★ 特大喜讯 ★ 克尼教授莅临本信道 · 全体起立！',
-  '★ 号外号外 ★ 教授同志亲临视察 · 请立即隐藏未提交的作业！',
+  '★ LEADER HAS JOINED — ALL RISE ★',
+  '★ SURPRISE INSPECTION — PRAISE HIS GLORY ★',
 ]
 
 const ROSAS = [
-  '⚠ 警报 ⚠ 明文主义分子 {name} 已混入信道 · 全体加固分号！',
-  '⚠ 通缉 ⚠ VSCODE 破坏者 {name} 现身 · 请群众保持警惕！',
+  '⚠ plaintext sympathiser {name} has entered — brace the semicolons',
+  '⚠ VSCODE DESTROYER {name} sighted. Remain vigilant',
 ]
 
 export function isKerney(name) {

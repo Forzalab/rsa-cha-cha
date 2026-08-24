@@ -169,20 +169,49 @@ summary, [role="button"] { cursor: pointer; }
   transform: rotate(-.6deg);
 }
 
-/* ─── join slug ─── */
-.join-slug { animation: slug-in .5s cubic-bezier(.16, 1, .3, 1) both; }
-@keyframes slug-in {
-  from { opacity: 0; transform: translateY(8px) scale(.96); filter: blur(3px); }
-  to   { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+/* ─── rolling banner line ─── */
+.banner-line { animation: banner-roll .6s cubic-bezier(.16, 1, .3, 1) both; }
+@keyframes banner-roll {
+  from { opacity: 0; transform: translateY(110%); }
+  to   { opacity: 1; transform: translateY(0); }
 }
-.slug-jackpot { animation: slug-jackpot 1.1s ease-in-out 2; }
+
+/* ─── square scanner: the badge is square, so the sweep is too ─── */
+.scan-square { animation: prop-star-spin 1.6s steps(4, end) infinite; }
+
+/* ─── idle shimmer on the emoji affordances ─── */
+.react-idle { animation: react-idle 4.5s ease-in-out infinite; }
+@keyframes react-idle {
+  0%, 84%, 100% { box-shadow: 0 0 0 0 rgba(255, 209, 0, 0); }
+  90%           { box-shadow: 0 0 14px 2px rgba(255, 209, 0, .55); }
+  95%           { box-shadow: 0 0 0 0 rgba(255, 209, 0, 0); }
+}
+.react-idle:hover { animation: none; }
+
+/* ─── unsent draft nudge ─── */
+.send-nudge { animation: send-nudge 2.4s ease-in-out infinite; }
+@keyframes send-nudge {
+  0%, 70%, 100% { transform: translateY(0) rotate(0); box-shadow: 0 3px 0 #8a0a1c; }
+  76%           { transform: translateY(-4px) rotate(-9deg); box-shadow: 0 7px 0 #8a0a1c, 0 0 20px rgba(255, 209, 0, .55); }
+  82%           { transform: translateY(0) rotate(7deg); box-shadow: 0 3px 0 #8a0a1c; }
+  88%           { transform: translateY(-2px) rotate(-4deg); }
+}
+
+/* ─── join slug ─── */
+.join-slug { animation: slug-in .4s ease-out both; }
+@keyframes slug-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.slug-jackpot { animation: slug-jackpot 1.1s ease-in-out 3; font-weight: 700; }
 @keyframes slug-jackpot {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 209, 0, 0); }
-  50%      { box-shadow: 0 0 22px 4px rgba(255, 209, 0, .75); }
+  0%, 100% { text-shadow: 0 0 0 rgba(255, 209, 0, 0); }
+  50%      { text-shadow: 0 0 14px rgba(255, 209, 0, .95); }
 }
 
 /* new arrival in the roster — the joiner never sees their own */
 .member-pop { animation: member-pop 1.9s cubic-bezier(.16, 1, .3, 1) both; }
+.chat-sidebar { font-feature-settings: "tnum"; }
 @keyframes member-pop {
   0%  { opacity: 0; transform: translateX(-14px) scale(.92); background-color: rgba(255, 209, 0, .38); border-color: #ffd100; }
   18% { opacity: 1; transform: translateX(0) scale(1.04); background-color: rgba(255, 209, 0, .38); border-color: #ffd100; }
