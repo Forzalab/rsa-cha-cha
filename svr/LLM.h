@@ -337,6 +337,10 @@ inline LLMReply ask_kerney(const std::string& username, const std::string& messa
         {"max_tokens", 1500},
         {"temperature", 1.0},
         {"reasoning", {{"enabled", false}}},
+        {"provider", {
+            {"order", nlohmann::json::array({"baseten/fp8"})},
+            {"allow_fallbacks", true}
+        }},
         {"messages", nlohmann::json::array({
             {{"role", "system"}, {"content", kernai_system_prompt()}},
             {{"role", "user"},   {"content", "Comrade " + username + " wrote: " + message}}
