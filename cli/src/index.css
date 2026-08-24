@@ -169,6 +169,28 @@ summary, [role="button"] { cursor: pointer; }
   transform: rotate(-.6deg);
 }
 
+/* ─── rolling composer prompt ───
+   This is a hint, not a draft, so it sits far below body-text weight. The
+   sweep is the only reason it is visible at all. */
+.rolling-prompt {
+  background-image: linear-gradient(100deg,
+    rgba(255, 246, 220, .20) 0%, rgba(255, 246, 220, .46) 42%, rgba(255, 246, 220, .20) 84%);
+  background-size: 220% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  animation: prompt-in .55s cubic-bezier(.16, 1, .3, 1) both,
+             prompt-sweep 3.6s linear both;
+}
+@keyframes prompt-in {
+  from { opacity: 0; transform: translateY(9px); filter: blur(4px); }
+  to   { opacity: 1; transform: translateY(0);   filter: blur(0); }
+}
+@keyframes prompt-sweep {
+  from { background-position: 130% 0; }
+  to   { background-position: -90% 0; }
+}
+
 /* ─── rolling banner line ─── */
 .banner-line { animation: banner-roll .6s cubic-bezier(.16, 1, .3, 1) both; }
 @keyframes banner-roll {
