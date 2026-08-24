@@ -163,6 +163,40 @@ summary, [role="button"] { cursor: pointer; }
 }
 
 /* the serial-number gag plate */
+/* ─── dissolve front: plaintext eats ciphertext left to right ───
+   The seam is the burn-line. It carries the glow and fades out to the right,
+   so the eye reads a direction: decrypted behind it, still-encrypted ahead. */
+.cipher-seam {
+  color: #fff6dc;
+  text-shadow: 0 0 6px rgba(255, 209, 0, .95), 0 0 16px rgba(255, 209, 0, .55);
+  -webkit-mask-image: linear-gradient(90deg, #000 0%, rgba(0, 0, 0, .35) 55%, transparent 100%);
+          mask-image: linear-gradient(90deg, #000 0%, rgba(0, 0, 0, .35) 55%, transparent 100%);
+}
+.cipher-cursor {
+  display: inline-block;
+  width: 7px;
+  height: 1em;
+  margin: 0 1px -1px;
+  background: #ffd100;
+  box-shadow: 0 0 8px rgba(255, 209, 0, .8);
+  animation: cipher-cursor-blink .8s steps(1, end) infinite;
+}
+@keyframes cipher-cursor-blink { 0%, 55% { opacity: 1; } 56%, 100% { opacity: .25; } }
+
+/* ─── rejection flash ───
+   #ff2d78 is deliberately off-palette: the poster red is #c8102e, warm and
+   dark. This is cooler, lighter, and far more saturated, so it cannot be
+   mistaken for the theme. Keyframes outrank normal declarations in the
+   cascade, so this beats the Tailwind bubble colours without !important. */
+.cipher-blocked { animation: cipher-reject .48s cubic-bezier(.36, .07, .19, .97) both; }
+@keyframes cipher-reject {
+  0%   { transform: translateX(0);    background-color: #26040a; border-color: rgba(255, 209, 0, .35); color: #fff6dc; }
+  16%  { transform: translateX(-5px); background-color: #5c0030; border-color: #ff2d78; color: #ffd6e6; }
+  44%  { transform: translateX(5px);  background-color: #5c0030; border-color: #ff2d78; color: #ffd6e6; }
+  70%  { transform: translateX(-2px); }
+  100% { transform: translateX(0);    background-color: #26040a; border-color: rgba(255, 209, 0, .35); color: #fff6dc; }
+}
+
 /* ─── typing wave: dots bob, they do not inflate ─── */
 .typing-dot {
   animation: typing-wave 1.25s ease-in-out infinite;

@@ -28,6 +28,7 @@ export default function App() {
   const [entryComplete, setEntryComplete] = useState(false)
   const [sendCoolingDown, setSendCoolingDown] = useState(false)
   const completeEntry = useCallback(() => setEntryComplete(true), [])
+  useEffect(() => { setHoveredCipher(null) }, [chat.messages.length])
   // Chinese shows first, English swaps in — the motion is what says 'button'
   useEffect(() => {
     const tick = window.setInterval(() => setLabelEnglish((on) => !on), 2600)
@@ -42,13 +43,21 @@ export default function App() {
   const [revealsLeft, setRevealsLeft] = useState(2)
   const [allCipher, setAllCipher] = useState(false)
   const [hoveredCipher, setHoveredCipher] = useState(null)
+  const [blockedFlash, setBlockedFlash] = useState(null)
+  const flashBlocked = (key) => {
+    setBlockedFlash(key)
+    window.setTimeout(() => setBlockedFlash((current) => (current === key ? null : current)), 480)
+  }
   const [labelEnglish, setLabelEnglish] = useState(false)
   const [ciphered, setCiphered] = useState(() => new Set())
-  const flipCipher = (id) => setCiphered((current) => {
-    const next = new Set(current)
-    next.has(id) ? next.delete(id) : next.add(id)
-    return next
-  })
+  const flipCipher = (id) => {
+    setOpenReactions(null)
+    setCiphered((current) => {
+      const next = new Set(current)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
   const [revealed, setRevealed] = useState(() => new Set())
 
   function scrollToNewest(behavior = 'smooth') {
@@ -127,7 +136,7 @@ export default function App() {
                <div className="flex items-center gap-3"><h2 className="font-semibold tracking-tight text-[#ffd100]">加密房间 · Encrypted Room</h2></div>
             <button
               type="button"
-              onClick={(event) => { event.stopPropagation(); setAllCipher((on) => !on); setCiphered(new Set()) }}
+              onClick={(event) => { event.stopPropagation(); setAllCipher((on) => !on); setCiphered(new Set()); setOpenReactions(null); flashBlocked('ALL') }}
               aria-pressed={allCipher}
               aria-label={allCipher ? 'Show plaintext' : 'Show ciphertext'}
               className={`cipher-switch group/switch flex shrink-0 items-center gap-2 rounded-full border-2 px-3 py-1.5 text-xs font-bold transition active:translate-y-px ${allCipher
@@ -161,7 +170,13 @@ export default function App() {
               // Messenger rule: the react affordance is always visible on the last
               // incoming bubble of a group. Everywhere else it stays hover-only.
               const pinnedReact = !own && !message.isAi && lastOfGroup
-              const showCipher = Boolean(message.cipher)
+              const wordCount = (message.plaintext || '').trim().split(/\s+/).filter(Boolean).length
+              // long incoming walls of text: no flip, and they never spend a reveal
+              const tooLong = !own && !message.isAi && wordCount > 25
+              const revealing = !own && !revealed.has(message.id) && revealsLeft > 0 && !tooLong
+              const cipherLocked = tooLong || revealing
+              const blocked = blockedFlash === message.id || (blockedFlash === 'ALL' && revealing)
+              const showCipher = Boolean(message.cipher) && !revealing
                 && ((allCipher !== ciphered.has(message.id)) || hoveredCipher === message.id)
               return (
                 <article key={message.id}
@@ -179,11 +194,11 @@ export default function App() {
                   ) : (<div
   role="button"
   tabIndex={0}
-  onClick={(event) => { event.stopPropagation(); flipCipher(message.id) }}
-  onPointerEnter={(event) => { if (event.pointerType === 'mouse') setHoveredCipher(message.id) }}
+  onClick={(event) => { event.stopPropagation(); if (cipherLocked) { flashBlocked(message.id); return } flipCipher(message.id) }}
+  onPointerEnter={(event) => { if (cipherLocked) return; if (event.pointerType === 'mouse') setHoveredCipher(message.id) }}
   onPointerLeave={() => setHoveredCipher((current) => (current === message.id ? null : current))}
-  onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); flipCipher(message.id) } }}
-  className={`bubble-arrive max-w-full whitespace-pre-wrap break-words [overflow-wrap:anywhere] border px-4 py-3 text-sm leading-6 shadow-lg cursor-pointer select-none
+  onKeyDown={(event) => { if (event.key !== 'Enter' && event.key !== ' ') return; event.preventDefault(); if (cipherLocked) { flashBlocked(message.id); return } flipCipher(message.id) }}
+  className={`bubble-arrive max-w-full whitespace-pre-wrap break-words [overflow-wrap:anywhere] border px-4 py-3 text-sm leading-6 shadow-lg select-none ${cipherLocked ? 'cursor-default' : 'cursor-pointer'} ${blocked ? 'cipher-blocked' : ''}
   ${own
     ? `border-[#ffd100]/40 bg-gradient-to-br from-[#e01b33] to-[#8a0a1c] text-[#fff6dc] shadow-black/50
        rounded-l-2xl ${firstOfGroup ? 'rounded-tr-2xl' : 'rounded-tr-md'} ${lastOfGroup ? 'rounded-br-md' : 'rounded-br-md'}`
@@ -193,7 +208,7 @@ export default function App() {
       : `border-[#ffd100]/35 bg-[#26040a]/92 text-[#fff6dc] shadow-black/50 backdrop-blur-md
          rounded-r-2xl ${firstOfGroup ? 'rounded-tl-2xl' : 'rounded-tl-md'} rounded-bl-md`}`}>{showCipher
   ? <span className="cipher-text block break-all font-mono text-[11px] leading-4">{message.cipher}</span>
-  : !own && !revealed.has(message.id) && revealsLeft > 0
+  : revealing
     ? <CipherReveal
         text={message.plaintext}
         cipher={message.cipher}
@@ -248,7 +263,7 @@ export default function App() {
             <div className="flex items-end gap-1.5 rounded-[1.75rem] border-2 border-[#ffd100]/25 bg-black/35 p-1.5 shadow-inner shadow-black/40 transition-all duration-300 hover:border-[#ffd100]/45 focus-within:border-[#ffd100]/70 focus-within:bg-black/45 focus-within:shadow-[0_0_28px_rgba(255,209,0,.12)]">
               <button type="button" onClick={(event) => { event.stopPropagation(); setStickerPickerOpen((open) => !open); setEmojiPickerOpen(false); setOpenReactions(null) }} disabled={!joined} aria-label="Open image picker" className={`grid h-10 w-10 shrink-0 place-items-center rounded-full transition duration-150 hover:scale-110 disabled:opacity-30 disabled:hover:scale-100 ${stickerPickerOpen ? 'bg-[#ffd100] text-[#4a0410]' : 'text-[#ffd100]/70 hover:bg-[#ffd100]/12 hover:text-[#ffd100]'}`}><ImagePlus size={19} /></button>
               <button type="button" onClick={(event) => { event.stopPropagation(); setEmojiPickerOpen((open) => !open); setStickerPickerOpen(false); setOpenReactions(null) }} disabled={!joined} aria-label="Open emoji picker" className={`grid h-10 w-10 shrink-0 place-items-center rounded-full transition duration-150 hover:scale-110 disabled:opacity-30 disabled:hover:scale-100 ${emojiPickerOpen ? 'bg-[#ffd100] text-[#4a0410]' : 'text-[#ffd100]/70 hover:bg-[#ffd100]/12 hover:text-[#ffd100]'}`}><Smile size={19} /></button>
-              <textarea value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) send(event) }} disabled={!joined} rows="1" wrap="soft" placeholder="Message the room…" aria-invalid={charactersOver > 0} className={`max-h-32 min-h-10 min-w-0 flex-1 resize-none overflow-y-auto whitespace-pre-wrap break-words [overflow-wrap:anywhere] bg-transparent px-2 py-2.5 text-sm outline-none placeholder:text-[#ffd100]/50 ${charactersOver ? 'text-rose-300' : 'text-[#fff6dc]'}`} />
+              <textarea value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) send(event) }} disabled={!joined} rows="1" wrap="soft" placeholder="Message the room…" aria-invalid={charactersOver > 0} className={`max-h-32 min-h-10 min-w-0 flex-1 resize-none overflow-y-auto whitespace-pre-wrap break-words [overflow-wrap:anywhere] bg-transparent px-2 py-2 text-sm leading-5 outline-none placeholder:text-[#ffd100]/50 ${charactersOver ? 'text-rose-300' : 'text-[#fff6dc]'}`} />
               <button disabled={!joined || !draft.trim() || charactersOver > 0 || sendCoolingDown} aria-label="Send message" className={`group grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#ffd100] text-[#4a0410] shadow-[0_3px_0_#8a0a1c] transition duration-150 hover:-translate-y-0.5 hover:shadow-[0_5px_0_#8a0a1c] active:translate-y-px active:shadow-[0_1px_0_#8a0a1c] disabled:opacity-25 disabled:shadow-none disabled:hover:translate-y-0 ${sendPulse ? 'send-burst' : ''}`}><Send className="transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" size={18} /></button>
             </div>
             <div className={`flex justify-end px-3 text-[10px] ${charactersOver > 0 || draftLength >= 450 || /\bkerney\b/i.test(draft) ? 'mt-1.5 h-4' : 'h-0'}`}>

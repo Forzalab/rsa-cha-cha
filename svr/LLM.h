@@ -319,12 +319,12 @@ inline std::string censor_reply(const std::string& text, const std::string& seed
         const auto hit = homonyms().find(lower);
         const std::uint32_t roll = censor_next(rng) % 100;
 
-        if (hit != homonyms().end() && roll < 50) {
+        if (hit != homonyms().end() && roll < 60) {
             std::string swap = hit->second;
             if (std::isupper(static_cast<unsigned char>(word[0])) && !swap.empty())
                 swap[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(swap[0])));
             out += swap;
-        } else if (word.size() >= 3 && roll < 20) {
+        } else if (word.size() >= 3 && roll < 15) {
             out.push_back(word.front());
             out.append(word.size() - 2, '*');
             out.push_back(word.back());
