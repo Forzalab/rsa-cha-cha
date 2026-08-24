@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
-import { Activity, ArrowDown, Eye, EyeOff, Fingerprint, ImagePlus, LockKeyhole, Radio, Send, ShieldCheck, Smile, SmilePlus } from 'lucide-react'
+import { Activity, ArrowDown, Eye, EyeOff, Fingerprint, ImagePlus, Radio, Send, ShieldCheck, Smile, SmilePlus } from 'lucide-react'
 import { JoinModal } from './components/JoinModal.jsx'
 import { RsaMatrixBackground } from './components/RsaMatrixBackground.jsx'
 import { useChatSocket } from './hooks/useChatSocket.js'
@@ -16,6 +16,20 @@ function StickerImage({ sticker, compact = false }) {
   const [failed, setFailed] = useState(false)
   if (failed) return <div className={`${compact ? 'h-24' : 'h-44'} grid w-full place-items-center rounded-xl border border-dashed border-white/10 bg-white/[.025] px-3 text-center text-xs text-[#f4e4c1]/45`}>{sticker.label}<br />asset needed</div>
   return <img src={sticker.src} alt={sticker.label} onError={() => setFailed(true)} className={`${compact ? 'h-24' : 'max-h-72'} w-full rounded-xl object-cover`} />
+}
+
+function HammerSickle({ className = '', size = 48 }) {
+  return (
+    <svg viewBox="0 0 64 64" width={size} height={size} className={className} fill="none"
+         stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round"
+         aria-hidden="true">
+      {/* sickle: blade arc sweeping up from the handle, opening to the left */}
+      <path d="M16 52C44 46 53 30 49 17c-1-3-4-4-6-2-2 2-1 5 1 7 4 5 3 14-6 20-6 4-14 6-22 10Z" />
+      {/* hammer: head and haft crossing the arc */}
+      <path d="M16 52 41 27" />
+      <path d="M35 14 52 31l-7 7-17-17Z" />
+    </svg>
+  )
 }
 
 const BANNERS = [
@@ -292,9 +306,9 @@ export default function App() {
           <div ref={messageListRef} onScroll={handleMessageScroll} className="flex flex-1 flex-col gap-1 overflow-y-auto scroll-smooth p-5 sm:p-7">
             {chat.messages.length === 0 && (
             <div className="m-auto flex max-w-sm flex-col items-center gap-3 px-6 text-center">
-              <span className="grid h-14 w-14 place-items-center border-2 border-[#ffd100]/50 bg-[#26040a]"><LockKeyhole className="text-[#ffd100]" size={26} /></span>
-              <p className="han text-sm text-[#ffd100]">房间安静</p>
-              <p className="text-sm text-[#fff6dc]/70">The room is quiet</p>
+              <HammerSickle className="text-white/22" size={52} />
+              <p className="han text-sm text-white/45">房间安静</p>
+              <p className="text-sm text-white/35">The room is quiet</p>
             </div>
             )}
             {chat.messages.map((message, i) => {
