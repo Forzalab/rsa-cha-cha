@@ -1,5 +1,12 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Comic+Neue:wght@400;700&display=swap');
 
+:root { --font-gag: 'Comic Neue', 'Comic Sans MS', 'Chalkboard SE', cursive; }
+
+body, button, input, textarea { font-family: var(--font-gag); }
+
+/* ciphertext and the matrix stay monospace or they stop reading as machine output */
+.cipher-text, .font-mono { font-family: ui-monospace, 'Courier New', monospace; }
 @theme {
   --font-sans: "Chakra Petch", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Space Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
@@ -12,6 +19,13 @@
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
+:root {
+  --accent: #e02020;        /* was amber-400 */
+  --accent-soft: #ff4d4d;
+  --gold: #ffd166;
+  --paper: #14090a;
+}
+body { background: var(--paper); }
 
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 320px; min-height: 100vh; }

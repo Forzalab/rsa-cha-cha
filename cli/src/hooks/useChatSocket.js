@@ -3,6 +3,10 @@ import { errorText, joinMessage, kerneyRequest, parseFrame, sendMessage } from '
 import { decryptText, DEV_KEYPAIR, encryptText } from '../lib/rsa.js'
 import { isRosas, randomMandarinPhrase } from '../lib/rosasMode.js'
 
+let idCounter = 0
+const newId = () =>
+  `${Date.now().toString(36)}-${(idCounter++).toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+  
 const DEFAULT_URL = `ws://${window.location.hostname || 'localhost'}:6868`
 const MAX_MESSAGE_LENGTH = 500
 const SEND_COOLDOWN_MS = 400
@@ -72,7 +76,7 @@ export function useChatSocket(url = import.meta.env.VITE_WS_URL || DEFAULT_URL) 
             applyReaction(message.content.message_id, plaintext, message.sender, message.content.reaction_action)
           } else {
             setMessages((current) => [...current, {
-              id: message.content?.message_id ?? crypto.randomUUID(),
+              id: message.content?.message_id ?? newId(),
               sender: message.sender,
               plaintext,
               cipher: message.content?.cipher ?? '',
@@ -84,7 +88,7 @@ export function useChatSocket(url = import.meta.env.VITE_WS_URL || DEFAULT_URL) 
         } else if (message.request === 'AI_DELIVER') {
           setKerneyThinking(false)
           setMessages((current) => current.some((item) => item.id === message.content?.message_id) ? current : [...current, {
-            id: message.content?.message_id ?? crypto.randomUUID(), sender: 'kerney',
+            id: message.content?.message_id ?? newId(), sender: 'kerney',
             plaintext: message.content?.text ?? '', cipher: '', reactions: {}, isAi: true,
           }])
         } else if (message.request.startsWith('ERR_')) {
@@ -133,7 +137,7 @@ export function useChatSocket(url = import.meta.env.VITE_WS_URL || DEFAULT_URL) 
 
     const outgoingPlaintext = isRosas(username) ? randomMandarinPhrase() : plaintext
     const cipher = encryptText(outgoingPlaintext)
-    const messageId = crypto.randomUUID()
+    const messageId = newId()
     const recipients = members.filter((member) => member !== username)
     for (const recipient of recipients) {
       socket.send(JSON.stringify(sendMessage(username, recipient, cipher, { message_id: messageId, event_id: messageId })))
@@ -153,7 +157,7 @@ export function useChatSocket(url = import.meta.env.VITE_WS_URL || DEFAULT_URL) 
     const cipher = encryptText(emoji)
     const message = messages.find((item) => item.id === messageId)
     const action = message?.reactions?.[emoji]?.includes(username) ? 'REMOVE' : 'ADD'
-    const eventId = crypto.randomUUID()
+    const eventId = newId()
     for (const recipient of members.filter((member) => member !== username)) {
       socket.send(JSON.stringify(sendMessage(username, recipient, cipher, {
         kind: 'REACTION', message_id: messageId, event_id: eventId, reaction_action: action,

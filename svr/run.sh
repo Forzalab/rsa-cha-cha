@@ -1,3 +1,2 @@
 cd svr; \
-lsof -ti:6868 | xargs -r kill -9; \
-make && ./server 6868
+make && lsof -ti:6868 | xargs -r kill -9 && ./server 6868
