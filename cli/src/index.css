@@ -294,6 +294,11 @@ summary, [role="button"] { cursor: pointer; }
 }
 
 .member-ping { animation: member-ping 1s ease-out; }
+.member-ping-danger { animation: member-ping-danger 1s ease-out; }
+@keyframes member-ping-danger {
+  0%   { background-color: rgba(255, 45, 120, .38); border-color: #ff2d78; }
+  100% { background-color: rgba(255, 45, 120, .12); border-color: #ff2d78; }
+}
 @keyframes member-ping {
   0%   { background-color: rgba(255, 209, 0, .32); border-color: #ffd100; }
   100% { background-color: transparent; border-color: transparent; }
@@ -583,4 +588,3 @@ summary, [role="button"] { cursor: pointer; }
   }
   .prop-track { animation: none !important; }
 }
-

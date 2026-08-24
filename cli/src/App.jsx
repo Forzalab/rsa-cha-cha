@@ -5,7 +5,7 @@ import { RsaMatrixBackground } from './components/RsaMatrixBackground.jsx'
 import { useChatSocket } from './hooks/useChatSocket.js'
 import { parseStickerMessage, STICKERS, stickerShortcode } from './lib/stickers.js'
 import { EMOJIS } from './lib/emojis.js'
-import { isKerney, joinSlug } from './lib/joinSlugs.js'
+import { isKerney, isRosasName, joinSlug } from './lib/joinSlugs.js'
 import { BOT_ID, displayName } from './lib/names.js'
 import { ping, unlockPing } from './lib/ping.js'
 import { CipherReveal } from './components/CipherReveal.jsx'
@@ -64,6 +64,20 @@ function HammerSickle({ className = '', size = 48 }) {
       </g>
     </svg>
   )
+}
+
+// The bot row and a human called "kerney" are the same rank, so they read the
+// same. Nothing special-cases the bot — BOT_ID matches the same regex.
+function memberTone(name) {
+  if (isKerney(name)) return 'border-[#ffd100] bg-[#ffd100]/10 font-bold text-[#ffd100]'
+  if (isRosasName(name)) return 'border-[#ff2d78] bg-[#ff2d78]/12 font-bold text-[#ff86ae]'
+  return 'border-transparent text-[#fff6dc] hover:border-[#ffd100]/50 hover:bg-[#ffd100]/[.07]'
+}
+
+function memberDot(name) {
+  if (isKerney(name)) return 'bg-[#ffd100]'
+  if (isRosasName(name)) return 'bg-[#ff2d78]'
+  return 'bg-[#ffd100]/70'
 }
 
 const BANNERS = [
@@ -295,13 +309,18 @@ export default function App() {
     }
     arrivalRef.current = chat.messages.length
     const latest = chat.messages[chat.messages.length - 1]
-    if (!latest || latest.sender === chat.username) return
+    if (!latest) return
+
+    // Sidebar lights for anyone who just spoke, including you. The loud
+    // half — chime, border pulse, dimming the room — stays off for your own
+    // traffic, or every keystroke you send rings your own bell.
+    setLitMember(latest.sender)
+    const a = window.setTimeout(() => setLitMember(null), 1000)
+    if (latest.sender === chat.username) return () => window.clearTimeout(a)
 
     setFramePulse((n) => n + 1)
-    setLitMember(latest.sender)
     setDimOthers(latest.id)
     ping()
-    const a = window.setTimeout(() => setLitMember(null), 1000)
     const b = window.setTimeout(() => setDimOthers(null), 700)
     return () => { window.clearTimeout(a); window.clearTimeout(b) }
   }, [chat.messages.length])
@@ -333,12 +352,13 @@ export default function App() {
             <span className="text-base font-bold tracking-tight text-[#fff6dc]">RSA Cha-Cha</span>
           </div>
           <div className="mt-7 space-y-1">
-            <div className="flex items-center gap-3 border-l-[3px] border-[#ffd100] bg-[#ffd100]/10 px-3 py-2 text-sm font-bold text-[#ffd100]">
-              <span className="h-2 w-2 shrink-0 bg-[#ffd100]" />{displayName(BOT_ID)}
+            <div className={`flex items-center gap-3 border-l-[3px] px-3 py-2 text-sm ${memberTone(BOT_ID)} ${litMember === BOT_ID ? 'member-ping' : ''}`}>
+              <span className={`h-2 w-2 shrink-0 ${memberDot(BOT_ID)}`} />{displayName(BOT_ID)}
+              {litMember === BOT_ID && <span className="msg-dot ml-auto h-2 w-2 shrink-0 rounded-full bg-[#ffd100]" />}
             </div>
             {(chat.members.length ? chat.members : chat.username ? [chat.username] : []).map((member) => (
-              <div key={`member:${member}`} className={`group flex items-center gap-3 border-l-[3px] border-transparent px-3 py-2 text-sm text-[#fff6dc] transition hover:border-[#ffd100]/50 hover:bg-[#ffd100]/[.07] ${freshMembers.includes(member) ? 'member-pop' : ''} ${litMember === member ? 'member-ping' : ''}`}>
-                <span className="h-2 w-2 shrink-0 bg-[#ffd100]/70" />{displayName(member)}{member === chat.username && <span className="ml-auto text-[10px] uppercase tracking-wider text-[#ffd100]/70">you</span>}{litMember === member && <span className="msg-dot ml-auto h-2 w-2 shrink-0 rounded-full bg-[#ffd100]" />}
+              <div key={`member:${member}`} className={`group flex items-center gap-3 border-l-[3px] px-3 py-2 text-sm transition ${memberTone(member)} ${freshMembers.includes(member) ? 'member-pop' : ''} ${litMember === member ? (isRosasName(member) ? 'member-ping-danger' : 'member-ping') : ''}`}>
+                <span className={`h-2 w-2 shrink-0 ${memberDot(member)}`} />{displayName(member)}{member === chat.username && <span className="ml-auto text-[10px] uppercase tracking-wider text-[#ffd100]/70">you</span>}{litMember === member && <span className={`msg-dot ml-auto h-2 w-2 shrink-0 rounded-full ${isRosasName(member) ? 'bg-[#ff2d78]' : 'bg-[#ffd100]'}`} />}
               </div>
             ))}
           </div>
