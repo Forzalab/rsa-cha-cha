@@ -163,6 +163,18 @@ summary, [role="button"] { cursor: pointer; }
 }
 
 /* the serial-number gag plate */
+/* ─── typing wave: dots bob, they do not inflate ─── */
+.typing-dot {
+  animation: typing-wave 1.25s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+.typing-dot:nth-child(2) { animation-delay: .16s; }
+.typing-dot:nth-child(3) { animation-delay: .32s; }
+@keyframes typing-wave {
+  0%, 62%, 100% { transform: translateY(0);    opacity: .38; }
+  31%           { transform: translateY(-5px); opacity: 1; }
+}
+
 /* ─── react nub: hover should feel like a thing you want to press ─── */
 .react-nub {
   transition: background-color .16s ease, border-color .16s ease, color .16s ease,

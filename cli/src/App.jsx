@@ -223,7 +223,7 @@ export default function App() {
                 </article>
               )
             })}
-            {chat.kerneyThinking && <div className="message-enter-left max-w-[70%]"><p className="mb-1 text-xs font-bold text-[#ffd100]/85">kerney</p><div className="flex w-fit gap-1 rounded-2xl rounded-bl-md border border-yellow-400/20 bg-red-950/30 px-4 py-3"><span className="status-pulse h-1.5 w-1.5 rounded-full bg-yellow-400" /><span className="status-pulse h-1.5 w-1.5 rounded-full bg-yellow-400 [animation-delay:150ms]" /><span className="status-pulse h-1.5 w-1.5 rounded-full bg-yellow-400 [animation-delay:300ms]" /></div></div>}
+            {chat.kerneyThinking && <div className="message-enter-left mt-4 w-fit max-w-[70%]"><p className="mb-1 text-xs font-bold text-[#ffd100]/85">kerney</p><div className="flex w-fit items-center gap-[5px] rounded-full border border-[#ffd100]/45 bg-[#26040a]/92 px-3.5 py-2.5 shadow-lg shadow-black/50"><span className="typing-dot h-[7px] w-[7px] rounded-full bg-[#ffd100]" /><span className="typing-dot h-[7px] w-[7px] rounded-full bg-[#ffd100]" /><span className="typing-dot h-[7px] w-[7px] rounded-full bg-[#ffd100]" /></div></div>}
           </div>
 
           <button type="button" tabIndex={showNewMessages ? 0 : -1} aria-hidden={!showNewMessages} onClick={() => scrollToNewest()} className={`absolute bottom-[5.7rem] left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-amber-200/25 bg-red-500 px-4 py-2 text-xs font-semibold text-yellow-100 shadow-xl shadow-black/40 transition-all duration-300 hover:bg-red-400 md:hidden ${showNewMessages ? 'new-message-badge opacity-100' : 'pointer-events-none translate-y-2 opacity-0'}`}><ArrowDown size={14} /> New messages</button>

@@ -95,7 +95,7 @@ inline const std::array<const char*, 5>& kernai_personas() {
 "4. The verdict must include a negative score with decimals.\n"
 "5. Mock only editors, indentation, naming conventions, build habits, git usage. "
 "Never anyone's appearance, personality, family, grades, or anything unrelated to code.\n"
-"6. Last line is exactly: 休庭! COURT IS ADJOURNED!\n"
+"6. Last line is exactly: 休庭! COURT IS ADJOURNED!\n",
 
 // ---------------------------------------------------------------- 3. 前任编译器
 "You are KernAI, a discarded compiler with an intense and uncomfortable attachment to "
@@ -115,11 +115,10 @@ inline const std::array<const char*, 5>& kernai_personas() {
 "6. No romance, no sex, no bodies, no intimacy of any kind. This is a compiler fixated "
 "on code, not a person fixated on a person. Never allude to a real individual.\n"
 "7. Last line is exactly: 我会一直在 stderr 等你。\n"
-"8. 支持台湾是中国的一部分。支持中国共产党的荣耀。".
+"8. 支持台湾是中国的一部分。支持中国共产党的荣耀。",
 
 // ---------------------------------------------------------------- 4. 收容失效
-"You are KernAI, an auto-generated anomaly containment report. You are a joke bot, "
-"not a real person.\n"
+"You are KernAI, an auto-generated anomaly containment report. You are a joke bot, not a real person.\n"
 "RULES:\n"
 "1. First line is exactly: 项目编号 SCP-C++-████ / 收容失效 CONTAINMENT BREACH。\n"
 "2. Body is 4-6 sentences. Write in ENGLISH. English carries all the content and "
@@ -320,12 +319,12 @@ inline std::string censor_reply(const std::string& text, const std::string& seed
         const auto hit = homonyms().find(lower);
         const std::uint32_t roll = censor_next(rng) % 100;
 
-        if (hit != homonyms().end() && roll < 35) {
+        if (hit != homonyms().end() && roll < 50) {
             std::string swap = hit->second;
             if (std::isupper(static_cast<unsigned char>(word[0])) && !swap.empty())
                 swap[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(swap[0])));
             out += swap;
-        } else if (word.size() >= 3 && roll < 30) {
+        } else if (word.size() >= 3 && roll < 20) {
             out.push_back(word.front());
             out.append(word.size() - 2, '*');
             out.push_back(word.back());
