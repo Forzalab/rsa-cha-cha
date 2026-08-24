@@ -343,6 +343,7 @@ export default function App() {
               <p className="text-sm text-white/35">The room is quiet</p>
             </div>
             )}
+            {chat.messages.length > 0 && <div className="mt-auto" />}
             {chat.messages.map((message, i) => {
               const leading = noticesAt(i)
               const own = message.sender === chat.username
