@@ -5,7 +5,9 @@ import { RsaMatrixBackground } from './components/RsaMatrixBackground.jsx'
 import { useChatSocket } from './hooks/useChatSocket.js'
 import { parseStickerMessage, STICKERS, stickerShortcode } from './lib/stickers.js'
 import { EMOJIS } from './lib/emojis.js'
-import { isKerney, joinSlug } from './lib/joinSlugs.js'
+import { isKerney, isRosasName, joinSlug } from './lib/joinSlugs.js'
+import { BOT_ID, displayName } from './lib/names.js'
+import { ping, unlockPing } from './lib/ping.js'
 import { CipherReveal } from './components/CipherReveal.jsx'
 import { PropagandaFrame } from './components/PropagandaFrame.jsx'
 
@@ -62,6 +64,20 @@ function HammerSickle({ className = '', size = 48 }) {
       </g>
     </svg>
   )
+}
+
+// The bot row and a human called "kerney" are the same rank, so they read the
+// same. Nothing special-cases the bot — BOT_ID matches the same regex.
+function memberTone(name) {
+  if (isKerney(name)) return 'border-[#ffd100] bg-[#ffd100]/10 font-bold text-[#ffd100]'
+  if (isRosasName(name)) return 'border-[#ff2d78] bg-[#ff2d78]/12 font-bold text-[#ff86ae]'
+  return 'border-transparent text-[#fff6dc] hover:border-[#ffd100]/50 hover:bg-[#ffd100]/[.07]'
+}
+
+function memberDot(name) {
+  if (isKerney(name)) return 'bg-[#ffd100]'
+  if (isRosasName(name)) return 'bg-[#ff2d78]'
+  return 'bg-[#ffd100]/70'
 }
 
 const BANNERS = [
@@ -164,7 +180,21 @@ export default function App() {
   // first roster is the room as it already was — announcing it would be noise.
   const [notices, setNotices] = useState([])
   const [freshMembers, setFreshMembers] = useState([])
-  const [frameFlash, setFrameFlash] = useState(false)
+  // One state machine for the whole frame. Overlapping triggers cannot stack
+  // because every transition is scheduled off a single stage value.
+  const [frameStage, setFrameStage] = useState('idle')
+  const [framePulse, setFramePulse] = useState(0)
+  const stageBusyRef = useRef(false)
+  const [litMember, setLitMember] = useState(null)
+  const [dimOthers, setDimOthers] = useState(null)
+
+  const runJackpot = useCallback(() => {
+    if (stageBusyRef.current) return
+    stageBusyRef.current = true
+    setFrameStage('freeze')
+    window.setTimeout(() => setFrameStage('flash'), 620)
+    window.setTimeout(() => { setFrameStage('idle'); stageBusyRef.current = false }, 620 + 780)
+  }, [])
   const seenMembersRef = useRef(null)
 
   useEffect(() => {
@@ -198,10 +228,7 @@ export default function App() {
       setFreshMembers((current) => current.filter((name) => !others.includes(name)))
     }, 1900)
 
-    if (others.some(isKerney)) {
-      setFrameFlash(true)
-      window.setTimeout(() => setFrameFlash(false), 1600)
-    }
+    if (others.some(isKerney)) runJackpot()
   }, [chat.members])
 
   const noticesAt = (index) => notices.filter((notice) => notice.anchor === index)
@@ -272,6 +299,32 @@ export default function App() {
     setShowNewMessages(true)
   }, [chat.messages.length])
 
+  // Reactive motion, unlike the ambient marquees, is causally tied to what
+  // someone just did — which is the only kind people actually notice.
+  const arrivalRef = useRef(0)
+  useEffect(() => {
+    if (chat.messages.length <= arrivalRef.current) {
+      arrivalRef.current = chat.messages.length
+      return
+    }
+    arrivalRef.current = chat.messages.length
+    const latest = chat.messages[chat.messages.length - 1]
+    if (!latest) return
+
+    // Sidebar lights for anyone who just spoke, including you. The loud
+    // half — chime, border pulse, dimming the room — stays off for your own
+    // traffic, or every keystroke you send rings your own bell.
+    setLitMember(latest.sender)
+    const a = window.setTimeout(() => setLitMember(null), 1000)
+    if (latest.sender === chat.username) return () => window.clearTimeout(a)
+
+    setFramePulse((n) => n + 1)
+    setDimOthers(latest.id)
+    ping()
+    const b = window.setTimeout(() => setDimOthers(null), 700)
+    return () => { window.clearTimeout(a); window.clearTimeout(b) }
+  }, [chat.messages.length])
+
   function send(event) {
     event.preventDefault()
     const message = draft.trim()
@@ -284,10 +337,11 @@ export default function App() {
   }
 
   return (
-    <main onClick={() => { setOpenReactions(null); setStickerPickerOpen(false); setEmojiPickerOpen(false) }} className="aurora grid-glow relative min-h-screen overflow-hidden app-main">
+    <main onPointerDown={unlockPing} onKeyDown={unlockPing} onClick={() => { setOpenReactions(null); setStickerPickerOpen(false); setEmojiPickerOpen(false) }} className="aurora grid-glow relative min-h-screen overflow-hidden app-main">
       <RsaMatrixBackground />
       <div className="scanlines pointer-events-none fixed inset-0 z-40 opacity-20" />
-      <PropagandaFrame flash={frameFlash} />
+      <div className={`freeze-veil ${frameStage === 'freeze' ? 'freeze-veil--on' : ''}`} />
+      <PropagandaFrame stage={frameStage} pulse={framePulse} />
       {!entryComplete && <JoinModal connectionStatus={chat.status} serverError={chat.error} onJoin={chat.join} onClearError={chat.clearError} onComplete={completeEntry} />}
 <div className="pointer-events-none absolute inset-x-24 top-0 h-px bg-gradient-to-r from-transparent via-yellow-400 to-transparent" />
       <section className="chat-shell chat-shell-fit relative z-10 mx-auto flex max-w-6xl overflow-hidden rounded-[1.75rem] border border-slate-300/10 shadow-[0_30px_100px_rgba(0,0,0,.55)] backdrop-blur-xl">
@@ -298,12 +352,13 @@ export default function App() {
             <span className="text-base font-bold tracking-tight text-[#fff6dc]">RSA Cha-Cha</span>
           </div>
           <div className="mt-7 space-y-1">
-            <div className="flex items-center gap-3 border-l-[3px] border-[#ffd100] bg-[#ffd100]/10 px-3 py-2 text-sm font-bold text-[#ffd100]">
-              <span className="h-2 w-2 shrink-0 bg-[#ffd100]" />kerney
+            <div className={`flex items-center gap-3 border-l-[3px] px-3 py-2 text-sm ${memberTone(BOT_ID)} ${litMember === BOT_ID ? 'member-ping' : ''}`}>
+              <span className={`h-2 w-2 shrink-0 ${memberDot(BOT_ID)}`} />{displayName(BOT_ID)}
+              {litMember === BOT_ID && <span className="msg-dot ml-auto h-2 w-2 shrink-0 rounded-full bg-[#ffd100]" />}
             </div>
             {(chat.members.length ? chat.members : chat.username ? [chat.username] : []).map((member) => (
-              <div key={`member:${member}`} className={`group flex items-center gap-3 border-l-[3px] border-transparent px-3 py-2 text-sm text-[#fff6dc] transition hover:border-[#ffd100]/50 hover:bg-[#ffd100]/[.07] ${freshMembers.includes(member) ? 'member-pop' : ''}`}>
-                <span className="h-2 w-2 shrink-0 bg-[#ffd100]/70" />{member}{member === chat.username && <span className="ml-auto text-[10px] uppercase tracking-wider text-[#ffd100]/70">you</span>}
+              <div key={`member:${member}`} className={`group flex items-center gap-3 border-l-[3px] px-3 py-2 text-sm transition ${memberTone(member)} ${freshMembers.includes(member) ? 'member-pop' : ''} ${litMember === member ? (isRosasName(member) ? 'member-ping-danger' : 'member-ping') : ''}`}>
+                <span className={`h-2 w-2 shrink-0 ${memberDot(member)}`} />{displayName(member)}{member === chat.username && <span className="ml-auto text-[10px] uppercase tracking-wider text-[#ffd100]/70">you</span>}{litMember === member && <span className={`msg-dot ml-auto h-2 w-2 shrink-0 rounded-full ${isRosasName(member) ? 'bg-[#ff2d78]' : 'bg-[#ffd100]'}`} />}
               </div>
             ))}
           </div>
@@ -372,7 +427,7 @@ export default function App() {
   className={`group/message w-fit max-w-[min(84%,30rem)] sm:max-w-[min(70%,38rem)] ${firstOfGroup ? 'mt-2.5 first:mt-0' : ''} ${own ? 'message-enter-right ml-auto' : 'message-enter-left mr-auto'}`}>
                 {firstOfGroup && (
                   <p className={`mb-1 flex items-center gap-1.5 text-xs font-bold text-[#ffd100]/85 ${own ? 'justify-end text-right' : ''}`}>
-                    {own ? 'You' : message.sender}
+                    {own ? 'You' : displayName(message.sender)}
                   </p>
                 )}
                   {sticker ? (
@@ -387,7 +442,7 @@ export default function App() {
   onPointerEnter={(event) => { if (cipherLocked) return; if (event.pointerType === 'mouse') setHoveredCipher(message.id) }}
   onPointerLeave={() => setHoveredCipher((current) => (current === message.id ? null : current))}
   onKeyDown={(event) => { if (event.key !== 'Enter' && event.key !== ' ') return; event.preventDefault(); if (cipherLocked) { flashBlocked(message.id); return } flipCipher(message.id) }}
-  className={`bubble-arrive max-w-full whitespace-pre-wrap break-words [overflow-wrap:anywhere] border px-4 py-3 text-sm leading-6 shadow-lg select-none ${cipherLocked ? 'cursor-default' : 'cursor-pointer'} ${blocked ? 'cipher-blocked' : ''}
+  className={`bubble-arrive max-w-full whitespace-pre-wrap break-words [overflow-wrap:anywhere] border px-4 py-3 text-sm leading-6 shadow-lg select-none ${cipherLocked ? 'cursor-default' : 'cursor-pointer'} ${blocked ? 'cipher-blocked' : ''} ${dimOthers && dimOthers !== message.id ? 'msg-recede' : ''} ${dimOthers === message.id ? 'msg-arrive-pop' : ''}
   ${own
     ? `border-[#ff8fa3]/35 bg-[#9e0c22] text-white shadow-black/40
        rounded-l-2xl ${firstOfGroup ? 'rounded-tr-2xl' : 'rounded-tr-md'} ${lastOfGroup ? 'rounded-br-md' : 'rounded-br-md'}`
@@ -431,7 +486,7 @@ export default function App() {
             {notices.filter((notice) => notice.anchor >= chat.messages.length).map((notice) => (
               <JoinSlug key={notice.id} notice={notice} />
             ))}
-            {chat.kerneyThinking && <div className="message-enter-left mt-4 w-fit max-w-[70%]"><p className="mb-1 text-xs font-bold text-[#ffd100]/85">kerney</p><div className="flex w-fit items-center gap-[5px] rounded-full border border-[#ffd100]/45 bg-[#26040a]/92 px-3.5 py-2.5 shadow-lg shadow-black/50"><span className="typing-dot h-[7px] w-[7px] rounded-full bg-[#ffd100]" /><span className="typing-dot h-[7px] w-[7px] rounded-full bg-[#ffd100]" /><span className="typing-dot h-[7px] w-[7px] rounded-full bg-[#ffd100]" /></div></div>}
+            {chat.kerneyThinking && <div className="message-enter-left mt-4 w-fit max-w-[70%]"><p className="mb-1 text-xs font-bold text-[#ffd100]/85">{displayName(BOT_ID)}</p><div className="flex w-fit items-center gap-[5px] rounded-full border border-[#ffd100]/45 bg-[#26040a]/92 px-3.5 py-2.5 shadow-lg shadow-black/50"><span className="typing-dot h-[7px] w-[7px] rounded-full bg-[#ffd100]" /><span className="typing-dot h-[7px] w-[7px] rounded-full bg-[#ffd100]" /><span className="typing-dot h-[7px] w-[7px] rounded-full bg-[#ffd100]" /></div></div>}
           </div>
 
           <button type="button" tabIndex={showNewMessages ? 0 : -1} aria-hidden={!showNewMessages} onClick={() => scrollToNewest()} className={`absolute bottom-[5.7rem] left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-amber-200/25 bg-red-500 px-4 py-2 text-xs font-semibold text-yellow-100 shadow-xl shadow-black/40 transition-all duration-300 hover:bg-red-400 md:hidden ${showNewMessages ? 'new-message-badge opacity-100' : 'pointer-events-none translate-y-2 opacity-0'}`}><ArrowDown size={14} /> New messages</button>

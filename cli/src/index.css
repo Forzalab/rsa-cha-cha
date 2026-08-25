@@ -118,8 +118,8 @@ summary, [role="button"] { cursor: pointer; }
   padding-inline: 1.75rem;
   will-change: transform;
 }
-.prop-strip--top .prop-track    { animation: prop-slide-left 34s linear infinite; }
-.prop-strip--bottom .prop-track { animation: prop-slide-right 41s linear infinite; }
+.prop-strip--top .prop-track    { animation: prop-slide-left 72s linear infinite; }
+.prop-strip--bottom .prop-track { animation: prop-slide-right 86s linear infinite; }
 
 .prop-strip--left .prop-track,
 .prop-strip--right .prop-track {
@@ -127,8 +127,8 @@ summary, [role="button"] { cursor: pointer; }
   padding-block: 1.75rem;
   padding-inline: 0;
 }
-.prop-strip--left .prop-track  { animation: prop-slide-up 47s linear infinite; }
-.prop-strip--right .prop-track { animation: prop-slide-down 53s linear infinite; }
+.prop-strip--left .prop-track  { animation: prop-slide-up 98s linear infinite; }
+.prop-strip--right .prop-track { animation: prop-slide-down 112s linear infinite; }
 
 @keyframes prop-slide-left  { from { transform: translateX(0); }     to { transform: translateX(-50%); } }
 @keyframes prop-slide-right { from { transform: translateX(-50%); }  to { transform: translateX(0); } }
@@ -234,7 +234,7 @@ summary, [role="button"] { cursor: pointer; }
 }
 
 /* new arrival in the roster — the joiner never sees their own */
-.member-pop { animation: member-pop 1.9s cubic-bezier(.16, 1, .3, 1) both; }
+.member-pop { animation: member-pop 1.9s cubic-bezier(.16, 1, .3, 1); }
 .chat-sidebar { font-feature-settings: "tnum"; }
 @keyframes member-pop {
   0%  { opacity: 0; transform: translateX(-14px) scale(.92); background-color: rgba(255, 209, 0, .38); border-color: #ffd100; }
@@ -243,12 +243,72 @@ summary, [role="button"] { cursor: pointer; }
   100%{ background-color: transparent; border-color: transparent; }
 }
 
-/* kerney arrives: the four banners go off like a slot machine */
-.prop-flash .prop-strip { animation: strip-flash .26s steps(1, end) 6; }
-.prop-flash .prop-star  { animation: prop-star-spin .5s linear infinite, strip-flash .26s steps(1, end) 6; }
+/* ─── the jackpot: freeze, drain the colour, then three bangs ───
+   A flash only reads as an event against stillness. The veil greys the page
+   with backdrop-filter rather than a filter on an ancestor, because `filter`
+   on a parent makes it the containing block for position:fixed children and
+   would rip the four strips off the viewport edges. */
+.freeze-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  pointer-events: none;
+  opacity: 0;
+  backdrop-filter: grayscale(.92) brightness(.72);
+  -webkit-backdrop-filter: grayscale(.92) brightness(.72);
+  transition: opacity .28s ease-out;
+}
+.freeze-veil--on { opacity: 1; }
+
+/* everything ambient holds its breath */
+.prop-freeze .prop-track,
+.prop-freeze .prop-star { animation-play-state: paused; }
+.prop-freeze .prop-strip { filter: grayscale(.92) brightness(.72); transition: filter .28s ease-out; }
+
+.prop-flash .prop-strip { animation: strip-flash .34s steps(2, end) 3; }
+.prop-flash .prop-star  { animation: prop-star-spin .45s linear infinite, strip-flash .34s steps(2, end) 3; }
 @keyframes strip-flash {
   0%, 49%   { filter: none; }
-  50%, 100% { filter: brightness(2.6) saturate(1.5); }
+  50%, 100% { filter: brightness(2.8) saturate(1.6); }
+}
+
+/* ─── a message landed ─── */
+.prop-pulse { animation: strip-pulse .42s cubic-bezier(.16, 1, .3, 1); }
+@keyframes strip-pulse {
+  0%   { filter: none; }
+  22%  { filter: brightness(1.75) saturate(1.25); }
+  100% { filter: none; }
+}
+
+.msg-recede { animation: msg-recede .7s ease-out; }
+@keyframes msg-recede {
+  0%, 100% { opacity: 1; }
+  30%      { opacity: .62; }
+}
+
+.msg-arrive-pop { animation: msg-arrive-pop .5s cubic-bezier(.2, 1.5, .35, 1); }
+@keyframes msg-arrive-pop {
+  0%   { transform: scale(1); }
+  35%  { transform: scale(1.045); }
+  100% { transform: scale(1); }
+}
+
+.member-ping { animation: member-ping 1s ease-out; }
+.member-ping-danger { animation: member-ping-danger 1s ease-out; }
+@keyframes member-ping-danger {
+  0%   { background-color: rgba(255, 45, 120, .38); border-color: #ff2d78; }
+  100% { background-color: rgba(255, 45, 120, .12); border-color: #ff2d78; }
+}
+@keyframes member-ping {
+  0%   { background-color: rgba(255, 209, 0, .32); border-color: #ffd100; }
+  100% { background-color: transparent; border-color: transparent; }
+}
+
+.msg-dot { animation: msg-dot 1s ease-out forwards; }
+@keyframes msg-dot {
+  0%   { opacity: 1; transform: scale(1.4); box-shadow: 0 0 10px rgba(255, 209, 0, .9); }
+  70%  { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(.7); }
 }
 
 /* ─── dissolve front: plaintext eats ciphertext left to right ───
