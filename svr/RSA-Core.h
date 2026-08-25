@@ -17,7 +17,7 @@ private:
     bool key_is_priv_; // it does matter... ish? this is a consensual flag, camt verify if pub or priv either way at creation.
 
 public:
-    LocksmithBox(const prime_size& n, const key& k, bool key_is_priv); // one obj per key, key cannot be reset hahahahahahhahah. how to store keys....?
+    LocksmithBox(const cpp_int& n, const key& k, bool key_is_priv); // one obj per key, key cannot be reset hahahahahahhahah. how to store keys....?
     LocksmithBox(const LocksmithBox& original_box, const key& k, bool key_is_priv);
     cpp_int decimal_from_text(const string& text) const;
     string  text_from_decimal(cpp_int big_num) const;
@@ -28,7 +28,7 @@ public:
     string  verify(const Message& signed_msg_decimal) const;
 };
 
-inline LocksmithBox::LocksmithBox(const prime_size& n, const key& k, bool key_is_priv) {
+inline LocksmithBox::LocksmithBox(const cpp_int& n, const key& k, bool key_is_priv) {
     this->n_ = n;
     this->key_ = k;
     this->key_is_priv_ = key_is_priv;    

@@ -14,8 +14,11 @@ int main() {
     // key mak3r
     key e = Utility::E(t), d = Utility::D(e, t);
     
-    LocksmithBox lock3r = new LocksmithBox(n, e, false);
-    LocksmithBox unlock3r = new LocksmithBox(lock3r, d, true);
+    LocksmithBox lock3r(n, e, false);
+    LocksmithBox unlock3r(lock3r, d, true);
     
-    lock3r.encrypt(s);
+    Message msg = lock3r.encrypt(s);
+    string result = unlock3r.decrypt(msg);
+
+    cout << result;
 }
