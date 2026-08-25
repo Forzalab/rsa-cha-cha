@@ -329,16 +329,26 @@ inline void Hub::leave(const std::string& who, const Session* session) {
 
 inline void Hub::announce_members() {
     json users = json::array();
+    // Parallel to users[], keyed by name. Every browser holds the whole
+    // directory from the moment it joins, so nobody needs a LOOKUP
+    // round-trip before sending. users[] keeps its old shape on purpose --
+    // any client that ignores keys{} keeps working unchanged.
+    json keys = json::object();
+
     for (auto it = dir_.begin(); it != dir_.end();) {
         if (auto session = it->second.session.lock()) {
             users.push_back(it->first);
+            keys[it->first] = json{{"value", it->second.key_value},
+                                   {"modulus", it->second.key_mod},
+                                   {"type", it->second.key_type}};
             ++it;
         } else {
             it = dir_.erase(it);
         }
     }
 
-    const json message = envelope("SERVER", "ROOM", "MEMBERS", json{{"users", users}});
+    const json message =
+        envelope("SERVER", "ROOM", "MEMBERS", json{{"users", users}, {"keys", keys}});
     for (const auto& [name, entry] : dir_) {
         if (auto session = entry.session.lock()) session->send(message);
     }
