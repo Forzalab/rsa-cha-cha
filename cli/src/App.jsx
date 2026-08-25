@@ -491,7 +491,7 @@ export default function App() {
 
           <button type="button" tabIndex={showNewMessages ? 0 : -1} aria-hidden={!showNewMessages} onClick={() => scrollToNewest()} className={`absolute bottom-[5.7rem] left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-amber-200/25 bg-red-500 px-4 py-2 text-xs font-semibold text-yellow-100 shadow-xl shadow-black/40 transition-all duration-300 hover:bg-red-400 md:hidden ${showNewMessages ? 'new-message-badge opacity-100' : 'pointer-events-none translate-y-2 opacity-0'}`}><ArrowDown size={14} /> New messages</button>
 
-          <form className="chat-composer relative border-t border-slate-300/8 p-4 sm:p-5" onSubmit={send}>
+          <form className="chat-composer relative p-4 sm:p-5" onSubmit={send}>
             {stickerPickerOpen && (
               <div onClick={(event) => event.stopPropagation()} className="sticker-pop absolute bottom-[5.4rem] left-4 z-30 w-[min(26rem,calc(100vw-2rem))] rounded-2xl border border-amber-200/10 bg-[#1b181f]/95 p-3 shadow-2xl shadow-black/60 backdrop-blur-xl sm:left-5">
                 <div className="mb-3 flex items-center justify-between px-1"><div><p className="text-sm font-semibold text-[#f4e4c1]/90">Class stickers</p><p className="mt-0.5 text-[10px] text-[#f4e4c1]/45">Pick one or type its :shortcode:</p></div><ImagePlus size={17} className="text-[#ffe873]" /></div>
