@@ -234,7 +234,7 @@ summary, [role="button"] { cursor: pointer; }
 }
 
 /* new arrival in the roster — the joiner never sees their own */
-.member-pop { animation: member-pop 1.9s cubic-bezier(.16, 1, .3, 1) both; }
+.member-pop { animation: member-pop 1.9s cubic-bezier(.16, 1, .3, 1); }
 .chat-sidebar { font-feature-settings: "tnum"; }
 @keyframes member-pop {
   0%  { opacity: 0; transform: translateX(-14px) scale(.92); background-color: rgba(255, 209, 0, .38); border-color: #ffd100; }
