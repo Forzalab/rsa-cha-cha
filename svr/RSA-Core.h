@@ -33,11 +33,13 @@ inline LocksmithBox::LocksmithBox(const cpp_int& n, const key& k, bool key_is_pr
 
 inline Message LocksmithBox::decimal_from_text(const string& text) const {
     // text -> one big integer
-    const Message msg = 0;
+    Message msg = 0;
 
-    const unsigned char* byteStringPtr = text.data(); // char[], it holds wack-ass cahrs like ëéè as one char.... perchance :)))
-
-  //  for (char* t = byteStringPtr; *t != '\0'; t++) {}
+    for (int i = text.length() - 1; i >= 0; i--) {
+        unsigned char c = text[i];
+        msg <<= 8;
+        msg += c;
+    }
 
     return msg;
 }
