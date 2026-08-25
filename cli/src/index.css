@@ -26,6 +26,8 @@
      padding, and the chat shell height. Change here, nowhere else. */
   --edge: 34px;
   --edge-gap: 12px;
+  /* every gold rule on the page reads from this — one thickness, no drift */
+  --rule: 1px;
 
   color: var(--cream);
   background: var(--paper);
@@ -82,7 +84,7 @@ summary, [role="button"] { cursor: pointer; }
   overflow: hidden;
   display: flex;
   align-items: center;
-  box-shadow: 0 0 0 2px var(--gold) inset, 0 0 24px rgba(0, 0, 0, .55);
+  box-shadow: 0 0 0 var(--rule) var(--gold) inset, 0 0 24px rgba(0, 0, 0, .55);
   text-shadow: 0 2px 0 rgba(0, 0, 0, .55);
   font-family: var(--font-han);
   font-weight: 900;
@@ -146,7 +148,7 @@ summary, [role="button"] { cursor: pointer; }
   color: var(--gold);
   font-size: 19px;
   background: #7d0a19;
-  box-shadow: 0 0 0 2px var(--gold) inset;
+  box-shadow: 0 0 0 var(--rule) var(--gold) inset;
   pointer-events: none;
   animation: prop-star-spin 9s linear infinite;
 }
@@ -201,16 +203,24 @@ summary, [role="button"] { cursor: pointer; }
 /* ─── square scanner: the badge is square, so the sweep is too ─── */
 .scan-square { animation: prop-star-spin 1.6s steps(4, end) infinite; }
 
-/* ─── idle shimmer on the emoji affordances ─── */
-.react-idle { animation: react-idle 4.5s ease-in-out infinite; }
-@keyframes react-idle {
-  0%, 84%, 100% { box-shadow: 0 0 0 0 rgba(255, 209, 0, 0); }
-  90%           { box-shadow: 0 0 14px 2px rgba(255, 209, 0, .55); }
-  95%           { box-shadow: 0 0 0 0 rgba(255, 209, 0, 0); }
+/* ─── idle twitch on the emoji affordances ───
+   box-shadow glows the element's rectangle. drop-shadow follows the alpha of
+   what is actually painted, so the glow traces the glyph instead of the
+   invisible 36px button around it. */
+.react-idle svg {
+  animation: icon-idle 4.5s ease-in-out infinite;
+  will-change: transform, filter;
 }
-.react-idle:hover { animation: none; }
-/* half a cycle behind, so the composer never blinks both buttons at once */
-.react-idle--offset { animation-delay: 2.25s; }
+@keyframes icon-idle {
+  0%, 83%, 100% { transform: rotate(0) scale(1);          filter: drop-shadow(0 0 0 rgba(255, 209, 0, 0)); }
+  86%           { transform: rotate(-11deg) scale(1.14);  filter: drop-shadow(0 0 5px rgba(255, 209, 0, .95)); }
+  89%           { transform: rotate(9deg) scale(1.14);    filter: drop-shadow(0 0 7px rgba(255, 209, 0, .95)); }
+  92%           { transform: rotate(-6deg) scale(1.08);   filter: drop-shadow(0 0 5px rgba(255, 209, 0, .8)); }
+  95%           { transform: rotate(3deg) scale(1.02);    filter: drop-shadow(0 0 2px rgba(255, 209, 0, .35)); }
+}
+.react-idle:hover svg { animation: none; }
+/* half a cycle behind, so the composer never twitches both icons at once */
+.react-idle--offset svg { animation-delay: 2.25s; }
 
 /* ─── unsent draft nudge ─── */
 .send-nudge { animation: send-nudge 2.4s ease-in-out infinite; }
@@ -462,18 +472,18 @@ summary, [role="button"] { cursor: pointer; }
 .chat-shell {
   background:
     linear-gradient(135deg, #8d0d1e, #5c0a14 58%, #7d0a19);
-  border-radius: 4px !important;
+  border-radius: 3px !important;
+  /* the old 5px red-deep ring outside the gold is what read as "thick" */
   box-shadow:
-    0 0 0 3px var(--gold),
-    0 0 0 8px var(--red-deep),
-    14px 14px 0 rgba(0, 0, 0, .55);
+    0 0 0 var(--rule) var(--gold),
+    12px 12px 0 rgba(0, 0, 0, .5);
 }
 
 .chat-sidebar {
   background:
     repeating-linear-gradient(135deg, rgba(255, 209, 0, .035) 0 9px, transparent 9px 18px),
     linear-gradient(180deg, #33060f, #1a0208);
-  border-right: 3px solid var(--gold);
+  border-right: var(--rule) solid var(--gold);
 }
 
 .chat-pane {
@@ -485,12 +495,13 @@ summary, [role="button"] { cursor: pointer; }
 
 .chat-header {
   background: linear-gradient(90deg, #d41f36, #8d0d1e);
-  border-bottom: 3px solid var(--gold);
+  border-bottom: var(--rule) solid var(--gold);
 }
 
+/* no bar. the pill floats on the chat pane. */
 .chat-composer {
-  background: linear-gradient(180deg, #6b0b17, #45050f);
-  border-top: 3px solid var(--gold);
+  background: transparent;
+  border-top: 0;
 }
 
 /* ─────────────────────────────────────────────
