@@ -17,9 +17,10 @@ private:
     bool key_is_priv_; // it does matter... ish? this is a consensual flag, camt verify if pub or priv either way at creation.
 
 public:
-    LocksmithBox(const cpp_int& n, const key& k, bool key_is_priv); // one obj per key, key cannot be reset hahahahahahhahah. how to store keys....?
+    LocksmithBox(const prime_size& n, const key& k, bool key_is_priv); // one obj per key, key cannot be reset hahahahahahhahah. how to store keys....?
+    LocksmithBox(const LocksmithBox& original_box, const key& k, bool key_is_priv);
     cpp_int decimal_from_text(const string& text) const;
-    string  text_from_decimal(const cpp_int& big_num) const;
+    string  text_from_decimal(cpp_int big_num) const;
  
     Message encrypt(const string& message, bool override_keytype_check = false) const;
     string  decrypt(const Message& encrypted_msg_decimal, bool override_keytype_check = false) const;
@@ -27,8 +28,16 @@ public:
     string  verify(const Message& signed_msg_decimal) const;
 };
 
-inline LocksmithBox::LocksmithBox(const cpp_int& n, const key& k, bool key_is_priv)
-    : key_(k), n_(n), key_is_priv_(key_is_priv) {
+inline LocksmithBox::LocksmithBox(const prime_size& n, const key& k, bool key_is_priv) {
+    this->n_ = n;
+    this->key_ = k;
+    this->key_is_priv_ = key_is_priv;    
+}
+
+inline LocksmithBox::LocksmithBox(const LocksmithBox& original_box, const key& k, bool key_is_priv) {
+    this->n_ = original_box.n_;
+    this->key_ = k;
+    this->key_is_priv_ = key_is_priv;
 }
 
 inline Message LocksmithBox::decimal_from_text(const string& text) const {
@@ -44,9 +53,18 @@ inline Message LocksmithBox::decimal_from_text(const string& text) const {
     return msg;
 }
 
-inline string LocksmithBox::text_from_decimal(const cpp_int& big_num) const {
+inline string LocksmithBox::text_from_decimal(cpp_int big_num) const {
     // inverse of decimal_from_text
-    return "";
+    string text = "";
+
+    // right shift wonky with Boost :-((
+    while (big_num > 0) {
+        unsigned char c = static_cast<unsigned char>(big_num % 256); // mf boost
+        text.insert(0, 1, c);
+        big_num /= 256;
+    }
+    
+    return text;
 }
 
 inline Message LocksmithBox::encrypt(const string& message, bool override_keytype_check) const {

@@ -1,29 +1,21 @@
-#include "Transport.h"
+#include "bits/stdc++.h" // fuck it, fix later
+#include "RSA-Core.h"
 
-#include <cstdlib>
-#include <iostream>
+int main() {
+    string s = "";
+    cin >> s;
 
-int main(int argc, char** argv) {
-    unsigned short port = 6868;
-    if (argc > 1) port = static_cast<unsigned short>(std::atoi(argv[1]));
+    // gen prime
+    prime_size size = 256;
+    cpp_int p = Utility::get_new_prime(size);
+    cpp_int q = Utility::get_new_prime(size);
+    cpp_int n = Utility::N(p,q), t = Utility::T(p,q);
 
-    try {
-        // One thread. One io_context. Every socket operation is a callback
-        // on this loop, so nothing runs concurrently and no mutex exists
-        // anywhere in this server.
-        bo::io_context ioc{1};
-
-        Hub hub;
-        tcp::acceptor acc{ioc, tcp::endpoint{tcp::v4(), port}};
-        acc.set_option(bo::socket_base::reuse_address(true));
-
-        do_accept(acc, hub);
-
-        std::cout << "rsa-cha-cha listening on ws://0.0.0.0:" << port << "\n";
-        ioc.run();
-    } catch (const std::exception& e) {
-        std::cerr << "fatal: " << e.what() << "\n";
-        return 1;
-    }
-    return 0;
+    // key mak3r
+    key e = Utility::E(t), d = Utility::D(e, t);
+    
+    LocksmithBox lock3r = new LocksmithBox(n, e, false);
+    LocksmithBox unlock3r = new LocksmithBox(lock3r, d, true);
+    
+    lock3r.encrypt(s);
 }
