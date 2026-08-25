@@ -7,7 +7,7 @@ using Message = cpp_int;
 
 // namespace std already been applied
 
-// goal: generalizable to js
+// goal: generalizable to js - lol nope, the inverse was true
 class LocksmithBox {
 private:
     // aux value here
@@ -60,7 +60,7 @@ inline string LocksmithBox::text_from_decimal(cpp_int big_num) const {
     // right shift wonky with Boost :-((
     while (big_num > 0) {
         unsigned char c = static_cast<unsigned char>(big_num % 256); // mf boost
-        text.insert(0, 1, c);
+        text += c;
         big_num /= 256;
     }
     
