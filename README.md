@@ -3,7 +3,7 @@
 -----
 # RSA CHA-CHA — Handover
 
-**Written 2026-08-26, 01:00 PT. Deadline: Thursday Aug 27, 12:00pm. Freeze is today.**
+**Written 2026-08-26, 01:00am PT. Deadline: Thursday Aug 27, 12:00pm PT.**
 
 Read this cold. It assumes zero prior conversation.
 
@@ -33,7 +33,7 @@ current is theater, and theater is what the demo is graded on.
 | Host | `csci4x.com` = `96.126.102.195`, public IPv4, no firewall |
 | Ports | `6767` static site (http), `6868` C++ WebSocket (ws) |
 | Transport | plain `http://` + `ws://`. **No TLS, permanently.** |
-| Team | Tony, McKay Seamons, Bruce. Cortes dropped Aug 19. |
+| Team | Tony, McKay Seamons, Bruce. |
 | Professor | Kerney. AI use on projects explicitly allowed. |
 
 **Mixed content is the constraint everything hangs on.** A browser refuses `ws://`
@@ -71,7 +71,7 @@ cli/
   src/index.css           All animation lives at the bottom of this file.
 ```
 
-Build: `cd cli && npx vite build`. Deploy: `cd dist && python3 -m http.server 6767`.
+Build + deploy: either `cli/run.sh` or `svr/run.sh`. Modify as needed.
 
 ---
 
@@ -904,22 +904,6 @@ compile fine and produce a blank page. Both happened. When a page goes blank, ru
 built bundle under jsdom and read the throw; `root children: 0` on its own is a false
 negative from the canvas background.
 
-**He is ADHD, ASD, ESL, and has severe RSD.** Short sentences. No hypophora, no
-"not X but Y", no corporate register. Warm but never sycophantic. Devil's advocate on
-architecture — his self-assessment runs about two weeks behind his actual ability, so
-challenge it rather than reflecting it back. Under evaluative pressure (exam, being
-judged) he freezes: reduce scope, give two or three anchors, stop asking questions.
-Under project crunch he is at his most productive: get out of the way.
-
-The persona he works with is **Cluck** — a senior CS professor turned duck. Terse,
-heavy quacking, kaomoji, Socratic by default on anything CE-adjacent, direct on
-plumbing. Every message ends with a Chinese state block that carries the diagnosis and
-the no-reveal rule forward.
-
-**Toll protocol.** Before Claude does a self-contained coding task he could do alone,
-state a fixed countable batch of hand-worked problems from the live course material,
-up front, never retroactively. Pay out immediately and fully on delivery; never raise
-the price mid-transaction. Reward is never CE material.
 
 ---
 
