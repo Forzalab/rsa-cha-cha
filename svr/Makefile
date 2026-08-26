@@ -1,6 +1,6 @@
 CXX      = g++
 CCFLAGS  = -Iinclude -I. \
-           -std=c++26 \
+           -std=c++26 -g \
            -Wfatal-errors -Wno-sign-compare \
            -fsanitize=undefined -fsanitize=address
 LDLIBS   = -lcurl -lpthread

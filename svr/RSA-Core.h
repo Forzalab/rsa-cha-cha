@@ -7,7 +7,7 @@ using Message = cpp_int;
 
 // namespace std already been applied
 
-// goal: generalizable to js
+// goal: generalizable to js - lol nope, the inverse was true
 class LocksmithBox {
 private:
     // aux value here
@@ -18,8 +18,9 @@ private:
 
 public:
     LocksmithBox(const cpp_int& n, const key& k, bool key_is_priv); // one obj per key, key cannot be reset hahahahahahhahah. how to store keys....?
+    LocksmithBox(const LocksmithBox& original_box, const key& k, bool key_is_priv);
     cpp_int decimal_from_text(const string& text) const;
-    string  text_from_decimal(const cpp_int& big_num) const;
+    string  text_from_decimal(cpp_int big_num) const;
  
     Message encrypt(const string& message, bool override_keytype_check = false) const;
     string  decrypt(const Message& encrypted_msg_decimal, bool override_keytype_check = false) const;
@@ -27,24 +28,43 @@ public:
     string  verify(const Message& signed_msg_decimal) const;
 };
 
-inline LocksmithBox::LocksmithBox(const cpp_int& n, const key& k, bool key_is_priv)
-    : key_(k), n_(n), key_is_priv_(key_is_priv) {
+inline LocksmithBox::LocksmithBox(const cpp_int& n, const key& k, bool key_is_priv) {
+    this->n_ = n;
+    this->key_ = k;
+    this->key_is_priv_ = key_is_priv;    
+}
+
+inline LocksmithBox::LocksmithBox(const LocksmithBox& original_box, const key& k, bool key_is_priv) {
+    this->n_ = original_box.n_;
+    this->key_ = k;
+    this->key_is_priv_ = key_is_priv;
 }
 
 inline Message LocksmithBox::decimal_from_text(const string& text) const {
     // text -> one big integer
-    const Message msg = 0;
+    Message msg = 0;
 
-    const unsigned char* byteStringPtr = text.data(); // char[], it holds wack-ass cahrs like ëéè as one char.... perchance :)))
-
-  //  for (char* t = byteStringPtr; *t != '\0'; t++) {}
+    for (int i = text.length() - 1; i >= 0; i--) {
+        unsigned char c = text[i];
+        msg <<= 8;
+        msg += c;
+    }
 
     return msg;
 }
 
-inline string LocksmithBox::text_from_decimal(const cpp_int& big_num) const {
+inline string LocksmithBox::text_from_decimal(cpp_int big_num) const {
     // inverse of decimal_from_text
-    return "";
+    string text = "";
+
+    // right shift wonky with Boost :-((
+    while (big_num > 0) {
+        unsigned char c = static_cast<unsigned char>(big_num % 256); // mf boost
+        text += c;
+        big_num /= 256;
+    }
+    
+    return text;
 }
 
 inline Message LocksmithBox::encrypt(const string& message, bool override_keytype_check) const {

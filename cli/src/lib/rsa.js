@@ -1,10 +1,16 @@
-// Temporary class-project keypair. This keeps the transport encrypted while
-// key generation is being implemented. Replace this module's key source once
-// the canonical RSA work lands.
-export const DEV_KEYPAIR = {
-  publicKey: { value: '17', modulus: '3233' },
-  privateKey: { value: '2753', modulus: '3233' },
-}
+// Browser-side RSA. A direct port of svr/RSA-Core.h + svr/RSA-Utility.h.
+//
+// Same algorithm as the C++ side, same byte order, same wire format: one
+// message packs into ONE integer, one modPow encrypts it, the ciphertext is
+// one decimal string. A cipher produced here decrypts in C++ and vice versa.
+//
+// Speed is the priority over key strength here -- this is a class demo on a
+// projector, not a key that guards anything. Both knobs are below.
+
+export const PRIME_DIGITS = 64 // each prime; N ends up ~128 digits
+export const MILLER_RABIN_ROUNDS = 5
+
+// ---------------------------------------------------------------- big-int math
 
 function modPow(base, exponent, modulus) {
   let result = 1n
@@ -20,20 +26,190 @@ function modPow(base, exponent, modulus) {
   return result
 }
 
-export function encryptText(text, publicKey = DEV_KEYPAIR.publicKey) {
-  return [...new TextEncoder().encode(text)]
-    .map((byte) => modPow(byte, publicKey.value, publicKey.modulus).toString().padStart(4, '0'))
-    .join('')
+// Euclid, same loop as Utility::gcd.
+function gcd(a, b) {
+  let x = a < 0n ? -a : a
+  let y = b < 0n ? -b : b
+  while (y !== 0n) {
+    const temp = y
+    y = x % y
+    x = temp
+  }
+  return x
 }
 
-export function decryptText(cipher, privateKey = DEV_KEYPAIR.privateKey) {
-  if (!/^\d*$/.test(cipher) || cipher.length % 4 !== 0) {
-    throw new Error('Invalid development ciphertext.')
+// Extended Euclid, same shape as Utility::D -- carries only the coefficient
+// on `a`, normalises a negative result by adding the modulus once.
+function modInverse(a, m) {
+  let oldR = a % m
+  let r = m
+  let oldS = 1n
+  let s = 0n
+
+  while (r !== 0n) {
+    const quotient = oldR / r
+    ;[oldR, r] = [r, oldR - quotient * r]
+    ;[oldS, s] = [s, oldS - quotient * s]
   }
 
+  const d = oldS % m
+  return d < 0n ? d + m : d
+}
+
+// ---------------------------------------------------------------- primes
+
+const SMALL_PRIMES = (() => {
+  const sieve = new Uint8Array(1000).fill(1)
+  const found = []
+  for (let i = 2; i < 1000; i++) {
+    if (!sieve[i]) continue
+    found.push(BigInt(i))
+    for (let j = i * i; j < 1000; j += i) sieve[j] = 0
+  }
+  return found
+})()
+
+function randomOddWithDigits(digits) {
+  const lower = 10n ** BigInt(digits - 1)
+  const span = 10n ** BigInt(digits) - lower
+
+  // Draw enough random bytes to cover the span, then fold into range.
+  const byteCount = Math.ceil((digits * 10) / 8) + 8
+  const bytes = new Uint8Array(byteCount)
+  crypto.getRandomValues(bytes)
+
+  let raw = 0n
+  for (const byte of bytes) raw = (raw << 8n) | BigInt(byte)
+
+  const candidate = lower + (raw % span)
+  return candidate % 2n === 0n ? candidate + 1n : candidate
+}
+
+function millerRabin(n, rounds = MILLER_RABIN_ROUNDS) {
+  if (n < 2n) return false
+  for (const p of SMALL_PRIMES) {
+    if (n === p) return true
+    if (n % p === 0n) return false
+  }
+
+  // n - 1 = d * 2^r with d odd
+  let d = n - 1n
+  let r = 0n
+  while (d % 2n === 0n) {
+    d /= 2n
+    r += 1n
+  }
+
+  for (let round = 0; round < rounds; round++) {
+    const a = 2n + (randomOddWithDigits(8) % (n - 4n))
+    let x = modPow(a, d, n)
+    if (x === 1n || x === n - 1n) continue
+
+    let composite = true
+    for (let i = 1n; i < r; i++) {
+      x = (x * x) % n
+      if (x === n - 1n) {
+        composite = false
+        break
+      }
+    }
+    if (composite) return false
+  }
+  return true
+}
+
+export function getNewPrime(digits = PRIME_DIGITS) {
+  // Walk upward by 2 instead of redrawing. Same expected number of primality
+  // tests, none of the wasted entropy, and it keeps the search local.
+  let candidate = randomOddWithDigits(digits)
+  while (!millerRabin(candidate)) candidate += 2n
+  return candidate
+}
+
+// ---------------------------------------------------------------- keygen
+
+export function generateKeypair(digits = PRIME_DIGITS) {
+  const p = getNewPrime(digits)
+  let q = getNewPrime(digits)
+  while (q === p) q = getNewPrime(digits)
+
+  const n = p * q
+  const t = (p - 1n) * (q - 1n)
+
+  let e = 65537n
+  if (gcd(e, t) !== 1n) {
+    e = 3n
+    while (gcd(e, t) !== 1n) e += 2n
+  }
+  const d = modInverse(e, t)
+
+  return {
+    publicKey: { value: e.toString(), modulus: n.toString() },
+    privateKey: { value: d.toString(), modulus: n.toString() },
+    // Kept for inspect mode. Nothing on the wire ever carries these.
+    factors: { p: p.toString(), q: q.toString(), totient: t.toString() },
+  }
+}
+
+// ---------------------------------------------------------------- text <-> int
+// Byte order matches RSA-Core.h exactly: text[0] is the LEAST significant
+// byte. Change one of these and you must change both, in two languages.
+
+export function decimalFromText(text) {
+  const bytes = new TextEncoder().encode(text)
+  let msg = 0n
+  for (let i = bytes.length - 1; i >= 0; i--) {
+    msg <<= 8n
+    msg += BigInt(bytes[i])
+  }
+  return msg
+}
+
+export function textFromDecimal(bigNum) {
+  let value = BigInt(bigNum)
   const bytes = []
-  for (let index = 0; index < cipher.length; index += 4) {
-    bytes.push(Number(modPow(cipher.slice(index, index + 4), privateKey.value, privateKey.modulus)))
+  while (value > 0n) {
+    bytes.push(Number(value % 256n))
+    value /= 256n
   }
   return new TextDecoder().decode(new Uint8Array(bytes))
+}
+
+// How many bytes fit strictly under this modulus. Anything longer packs to an
+// integer >= N and will not survive the round trip.
+export function maxBytesFor(modulus) {
+  const n = BigInt(modulus)
+  let bytes = 0
+  let ceiling = 1n
+  while (ceiling * 256n <= n) {
+    ceiling *= 256n
+    bytes += 1
+  }
+  return bytes
+}
+
+// ---------------------------------------------------------------- RSA
+
+export function encryptText(text, publicKey) {
+  if (!publicKey?.modulus) throw new Error('No public key for that recipient.')
+  const packed = decimalFromText(text)
+  if (packed >= BigInt(publicKey.modulus)) {
+    throw new Error('Message is too long for that key.')
+  }
+  return modPow(packed, publicKey.value, publicKey.modulus).toString()
+}
+
+export function decryptText(cipher, privateKey) {
+  if (!privateKey?.modulus) throw new Error('No private key available.')
+  if (!/^\d+$/.test(String(cipher))) throw new Error('Ciphertext is not a decimal integer.')
+  return textFromDecimal(modPow(cipher, privateKey.value, privateKey.modulus))
+}
+
+// Item 3. Identical machinery, opposite key order.
+export function signText(text, privateKey) {
+  return encryptText(text, privateKey)
+}
+
+export function verifySignature(signature, publicKey) {
+  return decryptText(signature, publicKey)
 }

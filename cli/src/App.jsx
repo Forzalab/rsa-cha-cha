@@ -390,7 +390,7 @@ export default function App() {
             </button>
           </header>
 
-          <div ref={messageListRef} onScroll={handleMessageScroll} className="flex flex-1 flex-col gap-1 overflow-y-auto scroll-smooth p-5 sm:p-7">
+          <div ref={messageListRef} onScroll={handleMessageScroll} className="message-list flex flex-1 flex-col gap-1 overflow-y-auto scroll-smooth p-5 sm:p-7">
             {chat.messages.length === 0 && (
             <div className="m-auto flex max-w-sm flex-col items-center gap-3 px-6 text-center">
               <HammerSickle className="text-white/20" size={58} />
@@ -463,7 +463,7 @@ export default function App() {
       />
     : message.plaintext}</div>
                   )}
-                  <div className={`relative flex items-center gap-1.5 ${lastOfGroup || reactions.length || reactionTrayOpen ? 'mt-1 h-7' : 'h-0'} ${own ? 'justify-end' : ''}`}>
+            <div className={`relative flex items-center gap-1.5 ${(lastOfGroup && next) || reactions.length || reactionTrayOpen || message.id === lastIncomingId ? 'mt-1 h-7' : 'h-0'} ${own ? 'justify-end' : ''}`}>
                     {visibleReactions.map(([emoji, people]) => (
                       <button type="button" key={emoji} onClick={(event) => { event.stopPropagation(); chat.react(message.id, emoji) }} title={people.join(', ')} className={`reaction-pop react-pill flex h-7 items-center gap-1 rounded-full border px-2 text-xs ${people.includes(chat.username) ? 'border-[#ffd100] bg-[#ffd100]/20 text-[#ffd100]' : 'border-[#ffd100]/30 bg-[#3d0510] text-[#fff6dc] hover:border-[#ffd100] hover:bg-[#ffd100]/15'}`}><span>{emoji}</span><span className="text-[10px] text-[#ffd100]/80">{people.length}</span></button>
                     ))}

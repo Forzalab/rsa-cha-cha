@@ -599,3 +599,7 @@ summary, [role="button"] { cursor: pointer; }
   }
   .prop-track { animation: none !important; }
 }
+
+.message-list > *:first-child {
+  margin-top: auto;
+}
