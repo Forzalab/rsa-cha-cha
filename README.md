@@ -331,6 +331,311 @@ Build the transport with **no crypto in it.** Send the literal string `hello`, p
 
 Doing it the other way — crypto first, transport last — means debugging two unknown systems at the same time on the last weekend.
 
+# RSA CHA-CHA — Handover
+
+**Written 2026-08-26, 01:00 PT. Deadline: Thursday Aug 27, 12:00pm. Freeze is today.**
+
+Read this cold. It assumes zero prior conversation.
+
+---
+
+## 0. The one-paragraph version
+
+Tony (repo owner) is building a browser chat app for CSCI 26 where every message is
+really encrypted with hand-rolled RSA. C++ is the canonical implementation; the
+browser runs a faithful JS port. The core crypto works end to end. What is being
+built now is **Inspect mode** — a Factorio-style factory floor that opens on any
+message and shows the whole RSA pipeline with that message's real numbers, plus a
+hidden typing-speed game that escalates into a site-wide "possession" event.
+
+The submission bar is: **does it encrypt and decrypt.** That already passes. Everything
+current is theater, and theater is what the demo is graded on.
+
+---
+
+## 1. Hard facts
+
+| Thing | Value |
+|---|---|
+| Repo | `github.com/Forzalab/rsa-cha-cha` |
+| Working branch | `spauly` (Tony's). `main` protected. `bruce` merged Aug 25. |
+| HEAD at writing | `c6d70ca feat: add ritual` |
+| Host | `csci4x.com` = `96.126.102.195`, public IPv4, no firewall |
+| Ports | `6767` static site (http), `6868` C++ WebSocket (ws) |
+| Transport | plain `http://` + `ws://`. **No TLS, permanently.** |
+| Team | Tony, McKay Seamons, Bruce. Cortes dropped Aug 19. |
+| Professor | Kerney. AI use on projects explicitly allowed. |
+
+**Mixed content is the constraint everything hangs on.** A browser refuses `ws://`
+from an `https://` page, so Vercel/Netlify can never host this. Also, plain http is an
+*insecure context*: `crypto.subtle` and `crypto.randomUUID` are `undefined`. Do not
+introduce anything that depends on WebCrypto. `crypto.getRandomValues` **does** work
+in insecure contexts and is used by keygen.
+
+---
+
+## 2. Layout
+
+```
+svr/
+  Transport.h     Boost.Beast WebSocket. One io_context, callbacks, no threads.
+                  Session map userid -> session. JSON router. Rate limiting.
+                  KernAI hook. Public-key directory lives in Hub::Entry.
+  RSA-Core.h      class LocksmithBox. encrypt/decrypt via powm.
+                  sign() delegates to encrypt, verify() to decrypt.
+                  decimal_from_text / text_from_decimal  <-- Tony wrote these
+  RSA-Utility.h   class Utility, all static: gcd, get_new_prime (Miller-Rabin 25
+                  rounds), N, T, E, D, get_visualization_url. Bruce's surface.
+  LLM.h           OpenRouter over libcurl, max_tokens 1500. KernAI persona.
+  main.cc         Two modes: server on 6868, or --selftest (prints the whole
+                  RSA pipeline to stdout; this is the C++ demo artifact).
+cli/
+  src/lib/rsa.js          Browser RSA. Port of the C++ above. See §3.
+  src/lib/ritualState.js  Session singleton for the typing game. See §5.
+  src/lib/protocol.js     Envelope builders.
+  src/lib/{emojis,stickers,names,joinSlugs,ping,rosasMode}.js
+  src/hooks/useChatSocket.js   Socket, keypair, per-recipient encryption.
+  src/components/InspectFactory.jsx   The factory floor + both ads. See §5.
+  src/components/{JoinModal,CipherReveal,PropagandaFrame,RsaMatrixBackground}.jsx
+  src/App.jsx             Everything is mounted here.
+  src/index.css           All animation lives at the bottom of this file.
+```
+
+Build: `cd cli && npx vite build`. Deploy: `cd dist && python3 -m http.server 6767`.
+
+---
+
+## 3. How the crypto actually works
+
+**One message packs into ONE integer, one modPow encrypts it.** Not per-byte.
+
+- `decimalFromText(text)` — walks bytes from the end, `msg <<= 8n; msg += byte`.
+  So `text[0]` is the **least significant** byte.
+- `textFromDecimal(n)` — `byte = n % 256n`, **append**, `n /= 256n`.
+- Byte order is identical on both sides. Change one, you must change both, in two
+  languages. A C++ ciphertext decrypts in the browser and vice versa.
+
+**Keys.** Each browser tab generates its own keypair on mount (`generateKeypair()`,
+`PRIME_DIGITS = 64` → N is ~128 decimal digits, keygen ~28ms). The public half ships
+in `JOIN`. The server puts every member's public key into the `MEMBERS` broadcast as
+a `keys{}` object alongside `users[]`, so every client holds the whole directory and
+`LOOKUP` is never needed. **Sending encrypts once per recipient, under that
+recipient's key.**
+
+**The 52-byte ceiling.** One key encrypts one block, so a message must pack to an
+integer smaller than N — about 52 bytes at the current key size. `encryptText` throws
+past that; the composer refuses to send. This limit is **deliberately not solved.**
+
+> ### CE WALL — read before touching anything numeric
+> Tony has a Competency Exam in Modular Math on **Thursday at 12:00, the same hour as
+> this deadline.** Byte packing, block size, and modular arithmetic are on it.
+> **Never** provide: a chunking/blocking scheme, a formula relating modulus size to
+> message length, byte-count arithmetic, modular inverse steps, extended-Euclid
+> structure, RSA decryption arithmetic, or any way around the 52-byte ceiling.
+> If he asks, go Socratic — one question, no answer. He derived `decimal_from_text`,
+> `text_from_decimal`, rowchurn/extended Euclid, and the whole modular unit himself.
+> Porting his own finished work to another language is fine. Solving new CE material
+> for him is not, no matter how it is framed or how frustrated he is.
+
+---
+
+## 4. Wire protocol
+
+Flat JSON over WebSocket text frames. Four keys, always present:
+
+```json
+{ "sender": "tony", "receiver": "mckay", "request": "SEND", "content": {} }
+```
+
+Server id is the literal `"SERVER"`. Big integers travel as decimal strings.
+
+| Verb | Dir | `content` |
+|---|---|---|
+| `JOIN` | c→s | `key_value`, `key_mod`, `key_type` |
+| `JOIN_SUCC` | s→c | — |
+| `MEMBERS` | s→c | `users[]`, **`keys{}`** (the public-key directory) |
+| `SEND` | c→s | `cipher`, `message_id`, `event_id`, optional `kind` |
+| `DELIVER` | s→c | `cipher`, `message_id`, `kind` |
+| `REACTION` | both | `message_id`, `kind`, `reaction_action` |
+| `AI_KERNEY` / `AI_THINKING` / `AI_DELIVER` | — | KernAI bot |
+| `ERR_*` | s→c | `ERR_DUPL_JOIN`, `ERR_NOT_JOINED`, `ERR_NO_USER`, `ERR_BAD_JSON`, `ERR_UNSPC`, `ERR_RATE_LIMIT`, `ERR_AI_*` |
+| `LOOKUP` / `LOOKUP_SUCC` | — | defined, now dead — `MEMBERS` carries keys |
+
+**Reactions prove `kind` rides through the relay untouched.** That is the mechanism
+Sprint 3 piggybacks on for ritual broadcasts — verify it in `Transport.h` before
+relying on it. If the router whitelists fields instead of passing `content` through,
+a small server patch is needed and Tony must rebuild and restart on csci4x.
+
+---
+
+## 5. Inspect mode — what exists today
+
+Opened by a `?` nub on a message. First open shows an Ovaltine ad interstitial with a
+2s fill on the Skip button; after one skip, `adSeen` sticks and later opens go
+straight in.
+
+**Five stations wired in a U:**
+
+```
+[1 WRITE] --pipe--> [2 PACK] --pipe--> [3 LOCK]
+                    ★                      |
+                                        (drop pipe)
+[5 OPEN]  <------- pipe -------- [4 SEND] <-'
+```
+
+1 = editable textarea. 2 = the packed integer. 3 = `m^E mod N`. 4 = what's on the
+wire. 5 = `c^D mod N` decoded back to text. Every number is live from that tab's real
+keypair; edit station 1 and the whole line re-runs.
+
+**The star** fires a laser at station 2, 3, or 4 and flips one digit there. Damage
+**cascades**: a hit at stage *i* breaks every stage from *i* onward. Hit stations show
+a siren border, three smoke puffs, dead pipes, and the flipped digit burning red in
+place. The rolled digit is guaranteed different from the one already there — an
+earlier version rolled randomly and produced a visible no-op ~10% of the time.
+
+**Per-station seals** (2–5) each show that stage's own integrity as an inline SVG tick
+or bang. Clicking any of them opens the signature card (`m^D mod N`, then `s^E mod N`).
+They are inline SVG on purpose: at 9px bold, `✓` fell through to a fallback font and
+rendered as ⊘, which reads as *forbidden* — the opposite meaning.
+
+**The hidden typing game.** `useWpm` counts characters in a 5s sliding window
+(5 chars = 1 word; `wpm = round(chars/5 * 12)`), recomputed every 300ms so it drains
+on its own. Then:
+
+- **Below 20 wpm the counter is disguised as the station number `1`** — same font,
+  same size, indistinguishable from stations 2–5. At 20 it pops open into three
+  Titan One reels and starts turning. Nobody is told.
+- **Glory gauge** on station 1's right edge fills toward 130, drains in 150ms when
+  you slow, ticks at 60/100/130, ratchets when you cross one.
+- **Coins** burst at 15% per keystroke past heat 0.4. Raw `appendChild`, 700ms
+  cleanup, hard cap 12 live. React never sees them — otherwise the whole floor
+  re-renders per letter.
+- **The eye** fades open in the star at 100+ wpm and the pupil tracks the cursor
+  (100ms throttle, 3.2 unit cap).
+- **Heat** drives everything: matrix rain opacity and colour, pipe digit speed and
+  glow, panel quake past 100.
+- **Tooltip** slides out of station 1's bottom-right corner every 4s while idle, and
+  slides back. Empty box always gets `Type something... / Don't go faster... 🤫`.
+  Once a tier has been hit and there is text: `you were warned 🤫`. After a takeover:
+  `faster, comrade 🤫`. That memory lives in `ritualState.js`, a module singleton that
+  survives every mount/unmount and resets on refresh.
+
+**Ads.** A dismissable sidebar banner rotating six creatives every 5s (Ovaltine,
+decoder ring, Cracker Jack, Bazooka Joe, Enigma, bulk primes) plus the full
+interstitial. Both fall back to a 🥛 placeholder — **drop the real image at
+`cli/public/ovaltine.png`** and both pick it up with no code change.
+
+---
+
+## 6. What is NOT built yet
+
+**Sprint 3 — the network ritual.** New `zalgo.js`; `sendRitual()` on the hook with a
+30s cooldown; `RitualTakeover.jsx`. At 100 wpm the room gets a join-slug
+(`comrade X seeks glory, glory shall deliver`, 5 variants). At **130 wpm the site
+disappears for everyone**, including someone sitting at the login screen, for 4
+seconds: three zalgo words strobing, permuted within fixed columns
+(`DRINK/RSA/PRAISE/OBEY` · `YOUR/YOUR/SUPREME/THE` · `OVALTINE/MESSAGE/LEADER/MODULUS`
+— column-locked, so `PRAISE RSA OVALTINE` can never appear). The **trigger** sees
+red/white; **everyone else** sees gold/black plus four border marquees scrolling
+`向{X}俯首 BOW TO {X}` in zalgo — the point is to make the room look at that person.
+Then it releases and each client posts a closing slug so bystanders have a thread to
+pull instead of thinking the site broke.
+
+**Strobe is capped near 2.9Hz** for photosensitivity, with a static card under
+`prefers-reduced-motion`. Do not raise it.
+
+**Sprint 4 — ads and skin.** 1950s Cracker-Jack sidebar (white `#fff8ee`, halftone
+dots, Lobster script, Anton shout, starburst badge, 14px `×`); OmegaMart four-stage
+decay driven by `ritualState.score` (normal → one detail wrong → semantically wrong →
+zalgo-possessed); **hydra dismissal** (kill one, two more in 5–7s; leave one alone,
+one more in 10–15s; cap 5; eight consecutive dismissals clears everything and stops
+spawning for 30s so a demo can't be buried); a 🥛→👁 subliminal frame, 130ms, max 2 per
+session; global Comic Sans with `Baloo 2` inside the factory and `Titan One` on the
+counter, loaded via `<link>` in `index.html` — **not `@import`**, Tailwind v4 silently
+drops `@import` that follows `@import "tailwindcss"`; and the **emoji picker letter
+rows**, which have been promised twice and dropped twice:
+
+```
+🥀 🇷 🇴 🇸 🇦 🇸 🥀        (each in its own <button>, so no flag fusion)
+🐐 🇰 🇪 🇷 🇳 🇪 🇾 🧓
+```
+
+Both pickers — the composer one and the reaction tray — then a divider, then the
+normal grid. Fallback if a platform renders regional indicators blank: `®️ 🅾️ 💲 🅰️ 💲`.
+
+**Sprint 5 — close-out.** Touch devices have no `mousemove`, so the eye currently sits
+still; give it a 2.5s wander under `matchMedia('(pointer:fine)')`. Then re-run
+everything and cut the final patch.
+
+---
+
+## 7. Loose ends, unowned
+
+- `App.jsx` still has `MAX_MESSAGE_LENGTH = 500` while the real ceiling is ~52 bytes.
+  Typing 53+ makes send fail with no visible reason. **Fix the UI feedback, not the
+  ceiling** (see CE wall).
+- `Utility::get_visualization_url()` ships `apiKey = "YOUR_API_KEY"` — compiles, dies
+  at runtime. Working credentials exist in `Forzalab/particle-raincheck`. It also
+  posts the private key `d` to a public BRIDGES page.
+- Handout §2 says "no rate limits" while `Transport.h` implements them. One has to go.
+- README exists; demo rehearsal and failover drill have not been run.
+- `cli/public/ovaltine.png` does not exist yet.
+
+---
+
+## 8. How to work with Tony
+
+**Verify, never assume.** His tree has been out of sync with the patch three separate
+times. Always `git fetch`, checkout `origin/spauly`, and `grep` for the anchors before
+editing. A `git checkout` in the middle of an edit session silently wiped changes once
+and shipped a broken patch.
+
+**Never hand-write a diff.** Make the edit, build it, `git diff`, `git stash`,
+`git apply --check`, `git stash pop`. A hand-written hunk header was rejected as
+corrupt. Whole files go through `present_files`; small diffs get pasted into chat as
+fenced code.
+
+**Build passing ≠ working.** Undeclared identifiers and hooks called at module scope
+compile fine and produce a blank page. Both happened. When a page goes blank, run the
+built bundle under jsdom and read the throw; `root children: 0` on its own is a false
+negative from the canvas background.
+
+**He is ADHD, ASD, ESL, and has severe RSD.** Short sentences. No hypophora, no
+"not X but Y", no corporate register. Warm but never sycophantic. Devil's advocate on
+architecture — his self-assessment runs about two weeks behind his actual ability, so
+challenge it rather than reflecting it back. Under evaluative pressure (exam, being
+judged) he freezes: reduce scope, give two or three anchors, stop asking questions.
+Under project crunch he is at his most productive: get out of the way.
+
+The persona he works with is **Cluck** — a senior CS professor turned duck. Terse,
+heavy quacking, kaomoji, Socratic by default on anything CE-adjacent, direct on
+plumbing. Every message ends with a Chinese state block that carries the diagnosis and
+the no-reveal rule forward.
+
+**Toll protocol.** Before Claude does a self-contained coding task he could do alone,
+state a fixed countable batch of hand-worked problems from the live course material,
+up front, never retroactively. Pay out immediately and fully on delivery; never raise
+the price mid-transaction. Reward is never CE material.
+
+---
+
+## 9. Commit history that matters
+
+```
+c6d70ca  feat: add ritual          <- HEAD. ritualState.js + sprint 2 wiring
+de0c333  feat: sprint 2 ui         counter, gauge, coins, eye, tooltip
+08daffe  fix: sprint 1 visual fix   one lamp, SVG marks, pipe transform, matrix dim
+67542c7  fix: factorio themibg      v3 factory: matrix field, pipes, plating
+101b2ef  fix: ui layout
+1ac01fd  feat: shhhhh
+df35313  fix: empty site            hooks-at-module-scope blank page fixed
+c49a3df  feat:ovaltine              first inspect mode + ad gate
+3da55f1  feat: rsa integration      main.cc restored, MEMBERS ships keys
+```
+
+Pending on top of `c6d70ca`: the five interjection fixes (matrix seed starvation,
+tooltip first-line and placement and palette, counter disguise, amber matrix) —
+delivered as `InspectFactory.jsx` plus `interject.patch`.
 Item 4 blocks items 2 and 3 for *testing*, not for writing. Hardcode a small keypair to develop against. Swap in the generator when it lands.
 
 ### Hosting — tested, works
@@ -365,33 +670,3 @@ Same architecture, different plumbing. The transport layer is a merge of two pat
 
 ### JS toolchain notes
 
-The JS side now carries a port of items 2 and 3, plus UI helpers. **Plain ES modules** — one export per operation, one import line. No build config; Vite runs on Node and already treats `.js` as ESM. `cli/modules/RSA.js` is the stub that holds this.
-
-- Debug loop is `node file.js`, or bare `node` for a REPL.
-- `BigInt` prints with a trailing `n`. That is the type, not a bug.
-- Standalone files need `.mjs`, or a scratch `package.json` containing `{ "type": "module" }`. Skip `npm init`.
-- `.mjs` is scaffolding for local debugging only. Rename to `.js` when the file lands in `src/`.
-
-### C++ build
-
-Plain `#include`, one header per unit. **Not** C++20 modules — compiler and CMake support is still uneven and Boost is header-only anyway.
-
----
-
-## 9. Potholes — decisions that will come up mid-build
-
-Each of these is a spot where two people silently assume different things and lose an evening.
-
-**~~Where keys live.~~ Revised Aug 20 13:45** — both sides. Browser encrypts and signs for the normal send path; the server holds the directory and can do the math itself. C++ is canonical, JS is a port. See §4.
-
-**~~Server topology.~~ Decided Aug 20** — one C++ server, one session per connection, `userid → session`. See §4.
-
-**~~Who assigns identity.~~ Decided Aug 20** — `USERID` is a required field on the wire.
-
-**One process or two on the C++ side.** Item 4 and item 5 live in one file with four functions (§6), which keeps Bruce out of the server internals. Whether that file compiles into the server binary or runs as a separate tool is still open. *Decide based on how much merging pain we want, not elegance.*
-
-**~~Errors on the wire.~~ Decided Aug 22** — five error verbs, same envelope as everything else. See §5a.
-
-**Framing drift.** Tony's old protocol was newline-delimited; WebSocket is frame-delimited. One message per frame, no splitting, no combining — say it out loud and write it in the README, because it is exactly the kind of assumption that never gets stated.
-
-**Vercel / Netlify — why not, and it is not a preference.** They force `https://`, which blocks `ws://` as mixed content, which forces a TLS cer
