@@ -742,3 +742,58 @@ summary, [role="button"] { cursor: pointer; }
   .desklamp, .desklamp-flare, .desklamp-flare .desklamp-bulb, .desklamp-flare .desklamp-cone,
   .rogue, .smoke, .seal-panic, .star-outer, .star-inner, .ad-swap { animation: none !important; }
 }
+
+/* ---- sprint 2: counter, gauge, coins, tooltip, quake ---- */
+.counter { display: inline-flex; gap: 1px; font-family: 'Titan One', 'Comic Neue', cursive;
+  font-size: 15px; line-height: 1em; color: #ffd100; }
+.reel { display: inline-block; height: 1em; width: .62em; overflow: hidden; }
+.reel-strip { display: block; transition: transform .12s cubic-bezier(.2,.9,.25,1); }
+.reel-cell { display: block; height: 1em; line-height: 1em; text-align: center; }
+.counter-hot { color: #ffe873; text-shadow: 0 0 10px rgba(255,232,115,.9), 0 0 20px rgba(255,209,0,.5); }
+.counter-rage { animation: counter-rage .12s steps(2) infinite; }
+@keyframes counter-rage {
+  0%   { transform: translate(-1px, 1px) }
+  100% { transform: translate(1px, -1px) }
+}
+
+.gauge { position: absolute; right: -13px; top: 6px; bottom: 6px; width: 8px;
+  border: 2px solid #7a5f24; background: #0d0107; overflow: visible; z-index: 12; }
+.gauge-fill { position: absolute; left: 0; right: 0; bottom: 0;
+  background: linear-gradient(180deg, #ff2d78, #ffd100 55%, #2dd4bf);
+  transition: height .15s linear; }
+.gauge-tick { position: absolute; right: -4px; width: 12px; height: 2px; background: #7a5f24; }
+.gauge-tick-lit { background: #ffe873; box-shadow: 0 0 8px rgba(255,232,115,.95); }
+.gauge-ratchet { animation: gauge-ratchet .4s cubic-bezier(.3,1.6,.4,1); }
+@keyframes gauge-ratchet {
+  0% { transform: translateY(0) } 30% { transform: translateY(3px) } 100% { transform: translateY(0) }
+}
+
+.coin { position: absolute; font-family: 'Space Mono', monospace; font-size: 13px; font-weight: 700;
+  color: #ffe873; text-shadow: 0 0 10px rgba(255,209,0,1); pointer-events: none;
+  animation: coin-pop .7s cubic-bezier(.2,.7,.3,1) forwards; }
+@keyframes coin-pop {
+  0%   { transform: translateY(0) scale(.5); opacity: 0 }
+  25%  { transform: translateY(-14px) scale(1.25); opacity: 1 }
+  100% { transform: translateY(-46px) scale(.8); opacity: 0 }
+}
+
+.tip-bubble { position: absolute; left: 50%; top: -46px; transform: translateX(-50%);
+  white-space: pre-line; text-align: center; z-index: 20;
+  background: #fff8ee; color: #23418f; border: 2px solid #23418f;
+  font-family: 'Comic Neue', 'Comic Sans MS', cursive; font-style: italic;
+  font-size: 11px; line-height: 1.25; padding: 5px 9px;
+  box-shadow: 3px 3px 0 rgba(0,0,0,.5); animation: tip-in .22s ease-out; }
+.tip-bubble::after { content: ''; position: absolute; left: 50%; bottom: -8px; margin-left: -6px;
+  width: 0; height: 0; border: 6px solid transparent; border-top-color: #23418f; }
+@keyframes tip-in { 0% { opacity: 0; transform: translate(-50%, -6px) } 100% { opacity: 1; transform: translateX(-50%) } }
+
+.panel-quake { animation: panel-quake .09s steps(2) infinite; }
+@keyframes panel-quake {
+  0%   { transform: translate(-1px, 1px) rotate(-.12deg) }
+  100% { transform: translate(1px, -1px) rotate(.12deg) }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .counter-rage, .gauge-ratchet, .coin, .panel-quake, .tip-bubble { animation: none !important; }
+  .panel-quake { transform: none !important; }
+}

@@ -5,8 +5,9 @@
 // cascades to every station after it. Caged lamps swing over each station:
 // warm flare when its digits move, red strobe when it takes a hit.
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { decimalFromText, textFromDecimal, modPow, maxBytesFor } from '../lib/rsa.js'
+import { markTier, tooltipLine } from '../lib/ritualState.js'
 
 const OVALTINE_SRC = '/ovaltine.png' // real asset: cli/public/ovaltine.png
 
@@ -129,25 +130,29 @@ const MarkBad = () => (
   <svg viewBox="0 0 12 12" className="h-2.5 w-2.5"><path d="M6 2v5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" /><circle cx="6" cy="10" r="1.2" fill="currentColor" /></svg>
 )
 
-function Pipe({ digits, reversed = false, dead = false, className = '' }) {
+function Pipe({ digits, reversed = false, dead = false, heat = 0, className = '' }) {
   return (
     <div className={`pipe ${dead ? 'pipe-dead' : ''} ${reversed ? 'pipe-rev' : ''} ${className}`}>
       <span className="pipe-fluid" />
       {digits.map((d, i) => (
-        <span key={i} className="pipe-bit" style={{ animationDelay: `${i * 0.42}s`, top: `${18 + (i % 3) * 26}%` }}>{d}</span>
+        <span key={i} className="pipe-bit" style={{
+          animationDelay: `${i * 0.42}s`, top: `${18 + (i % 3) * 26}%`,
+          animationDuration: `${2.5 / (1 + heat * 2.5)}s`,
+          textShadow: heat > 0.05 ? `0 0 ${7 + heat * 12}px rgba(255,232,115,${0.9 + heat * 0.1}), 0 0 ${heat * 22}px rgba(180,255,120,${heat}), 0 0 14px rgba(0,0,0,.95)` : undefined,
+        }}>{d}</span>
       ))}
     </div>
   )
 }
 
-function Station({ n, tone, seal, onSeal, innerRef, footer, children }) {
+function Station({ n, tone, seal, onSeal, innerRef, footer, rail, children }) {
   return (
     <div ref={innerRef} className={`station relative z-10 w-44 shrink-0 ${tone === 'danger' ? 'station-hit' : tone === 'hot' ? 'station-live' : ''}`}>
       <div className="station-plate">
         <span className="rivet" style={{ left: 4, top: 4 }} /><span className="rivet" style={{ right: 4, top: 4 }} />
         <span className="rivet" style={{ left: 4, bottom: 4 }} /><span className="rivet" style={{ right: 4, bottom: 4 }} />
         <div className="flex items-center gap-1.5 border-b border-[#ffd100]/25 px-2 py-1">
-          <span className="grid h-5 w-5 place-items-center border border-[#ffd100]/60 bg-[#ffd100]/10 font-mono text-[11px] font-black text-[#ffd100]">{n}</span>
+          <span className="grid min-h-5 min-w-5 place-items-center border border-[#ffd100]/60 bg-[#ffd100]/10 px-1 font-mono text-[11px] font-black text-[#ffd100]">{n}</span>
           {tone === 'hot' && <span className="ml-auto text-[11px]">✏️</span>}
           {seal != null && (
             <button type="button" onClick={onSeal} aria-label="signature"
@@ -158,6 +163,7 @@ function Station({ n, tone, seal, onSeal, innerRef, footer, children }) {
         </div>
         <div className="h-20 overflow-y-auto break-all p-2 font-mono text-[10px] leading-4 text-[#fff6dc]/85">{children}</div>
       </div>
+      {rail}
       {footer}
       {tone === 'danger' && <>
         <span className="smoke" style={{ left: '20%' }} />
@@ -168,7 +174,7 @@ function Station({ n, tone, seal, onSeal, innerRef, footer, children }) {
   )
 }
 
-function RayStar({ armed, onFire }) {
+function RayStar({ armed, onFire, eye = 0, gaze = { x: 0, y: 0 } }) {
   const [tip, setTip] = useState(false)
   return (
     <button type="button" onClick={onFire} onMouseEnter={() => setTip(true)} onMouseLeave={() => setTip(false)}
@@ -179,8 +185,83 @@ function RayStar({ armed, onFire }) {
       <svg viewBox="0 0 64 64" className={`absolute inset-3 star-inner ${armed ? 'star-armed' : ''}`}>
         <polygon points="32,8 46,32 32,56 18,32" fill="#ffd100" opacity=".9" />
       </svg>
+      {eye > 0 && (
+        <svg viewBox="0 0 64 64" className="pointer-events-none absolute inset-0" style={{ opacity: eye }}>
+          <ellipse cx="32" cy="32" rx="13" ry="8" fill="#fff8ee" />
+          <circle cx={32 + gaze.x} cy={32 + gaze.y} r="5.2" fill="#0d0107" />
+          <circle cx={32 + gaze.x + 1.6} cy={32 + gaze.y - 1.6} r="1.5" fill="#fff8ee" opacity=".8" />
+          <path d="M19 32a13 8 0 0 0 26 0" fill="none" stroke="#7a5f24" strokeWidth="1.4" />
+        </svg>
+      )}
       {tip && <span className="pointer-events-none absolute -top-6 left-1/2 -translate-x-1/2 border border-[#ffd100]/60 bg-[#12010a] px-1.5 font-mono text-[9px] text-[#ffd100]">zap</span>}
     </button>
+  )
+}
+
+const TIERS = [60, 100, 130]
+
+// Five characters is one word. Five second window, so a full window holds
+// wpm/12 words. Typing stops, the window drains on its own.
+function useWpm() {
+  const events = useRef([])
+  const lastLen = useRef(0)
+  const [wpm, setWpm] = useState(0)
+
+  const recompute = useCallback(() => {
+    const now = Date.now()
+    events.current = events.current.filter((e) => now - e.t < 5000)
+    const chars = events.current.reduce((sum, e) => sum + e.n, 0)
+    setWpm(Math.round((chars / 5) * 12))
+  }, [])
+
+  const feed = useCallback((len) => {
+    const delta = len - lastLen.current
+    lastLen.current = len
+    if (delta > 0) events.current.push({ t: Date.now(), n: delta })
+    recompute()
+  }, [recompute])
+
+  const reset = useCallback(() => {
+    events.current = []
+    setWpm(0)
+  }, [])
+
+  useEffect(() => {
+    const id = setInterval(recompute, 300)
+    return () => clearInterval(id)
+  }, [recompute])
+
+  return { wpm, feed, reset }
+}
+
+// Fixed three reels. Leading zeros stay in the layout but go invisible, so
+// 9 -> 10 -> 100 never shifts anything sideways.
+function Counter({ value, hot, rage }) {
+  const digits = String(Math.min(999, value)).padStart(3, '0').split('')
+  const lead = String(Math.min(999, value)).padStart(3, '0').search(/[1-9]/)
+  return (
+    <span className={`counter ${hot ? 'counter-hot' : ''} ${rage ? 'counter-rage' : ''}`}>
+      {digits.map((d, i) => (
+        <span key={i} className="reel" style={{ opacity: value === 0 ? (i === 2 ? 1 : 0) : i < lead ? 0 : 1 }}>
+          <span className="reel-strip" style={{ transform: `translateY(-${Number(d)}em)` }}>
+            {'0123456789'.split('').map((n) => <span key={n} className="reel-cell">{n}</span>)}
+          </span>
+        </span>
+      ))}
+    </span>
+  )
+}
+
+// Fills as you type, drains the moment you slow. The drain is the point.
+function GloryGauge({ wpm, ratchet }) {
+  const fill = Math.min(1, wpm / 130)
+  return (
+    <div className={`gauge ${ratchet ? 'gauge-ratchet' : ''}`}>
+      <div className="gauge-fill" style={{ height: `${fill * 100}%` }} />
+      {TIERS.map((t) => (
+        <span key={t} className={`gauge-tick ${wpm >= t ? 'gauge-tick-lit' : ''}`} style={{ bottom: `${(t / 130) * 100}%` }} />
+      ))}
+    </div>
   )
 }
 
@@ -211,6 +292,13 @@ export function InspectFactory({ message, keypair, onClose }) {
   const [beam, setBeam] = useState(null)
   const [sealAt, setSealAt] = useState(null)
   const [pulse, setPulse] = useState(0)
+  const [gaze, setGaze] = useState({ x: 0, y: 0 })
+  const [tip, setTip] = useState(false)
+  const [ratchet, setRatchet] = useState(false)
+
+  const { wpm, feed, reset: resetWpm } = useWpm()
+  const coinsRef = useRef(null)
+  const lastTierRef = useRef(0)
 
   const panelRef = useRef(null)
   const starRef = useRef(null)
@@ -249,6 +337,62 @@ export function InspectFactory({ message, keypair, onClose }) {
     return () => clearTimeout(t)
   }, [pulse])
 
+  const heat = Math.min(1, wpm / 130)
+  const tier = wpm >= 130 ? 3 : wpm >= 100 ? 2 : wpm >= 60 ? 1 : 0
+
+  // Crossing a tick kicks the gauge and is remembered for the whole session.
+  useEffect(() => {
+    if (tier > lastTierRef.current) {
+      markTier(tier)
+      setRatchet(true)
+      const id = setTimeout(() => setRatchet(false), 420)
+      lastTierRef.current = tier
+      return () => clearTimeout(id)
+    }
+    if (tier < lastTierRef.current) lastTierRef.current = tier
+  }, [tier])
+
+  // Idle nagging. Silent the moment anything is being typed.
+  useEffect(() => {
+    if (wpm > 0) { setTip(false); return }
+    let visible = false
+    const id = setInterval(() => {
+      visible = !visible
+      setTip(visible)
+      if (visible) setTimeout(() => setTip(false), 1500)
+    }, 4000)
+    return () => clearInterval(id)
+  }, [wpm])
+
+  // Pupil follows the cursor, capped so it reads as a glance not a lurch.
+  const trackRef = useRef(0)
+  const onPanelMove = (event) => {
+    if (tier < 2) return
+    const now = Date.now()
+    if (now - trackRef.current < 100) return
+    trackRef.current = now
+    const box = starRef.current?.getBoundingClientRect()
+    if (!box) return
+    const dx = event.clientX - (box.x + box.width / 2)
+    const dy = event.clientY - (box.y + box.height / 2)
+    const dist = Math.hypot(dx, dy) || 1
+    setGaze({ x: (dx / dist) * 3.2, y: (dy / dist) * 3.2 })
+  }
+
+  // Coins are pure DOM. Putting them through React would re-render the whole
+  // floor on every keystroke for confetti nobody clicks.
+  const burstCoin = () => {
+    const host = coinsRef.current
+    if (!host || host.childNodes.length >= 12) return
+    const coin = document.createElement('span')
+    coin.className = 'coin'
+    coin.textContent = String(Math.floor(Math.random() * 10))
+    coin.style.left = `${10 + Math.random() * 80}%`
+    coin.style.top = `${15 + Math.random() * 60}%`
+    host.appendChild(coin)
+    setTimeout(() => coin.remove(), 700)
+  }
+
   const bytes = new TextEncoder().encode(draft).length
   const fuel = Math.min(1, bytes / limit)
   const over = bytes > limit
@@ -265,15 +409,23 @@ export function InspectFactory({ message, keypair, onClose }) {
       setTimeout(() => setBeam(null), 700)
     }
     const probe = { pack: line.m, lock: line.cipher, wire: line.wire }[target]
-    setTimeout(() => setRay({ target, at: 1 + Math.floor(Math.random() * Math.max(1, probe.length - 1)), digit: String(Math.floor(Math.random() * 10)) }), 260)
+    setTimeout(() => {
+      const at = 1 + Math.floor(Math.random() * Math.max(1, probe.length - 1))
+      // Never roll the digit that is already sitting there, or the ray lands
+      // and nothing happens. Shift by 1..9 so the flip is always a real flip.
+      const digit = String((Number(probe[at] ?? '0') + 1 + Math.floor(Math.random() * 9)) % 10)
+      setRay({ target, at, digit })
+    }, 260)
   }
 
   const bits = (src, n) => Array.from({ length: n }, (_, i) => src[(i * 7 + 3) % src.length] ?? '0')
 
   return (
     <div className="fixed inset-0 z-[60] overflow-y-auto bg-black/90 p-3 sm:p-8" onClick={onClose}>
-      <div ref={panelRef} onClick={(e) => e.stopPropagation()} className="relative mx-auto w-fit max-w-full overflow-hidden border-4 border-[#ffd100] bg-[#0d0107] p-4 shadow-[12px_12px_0_rgba(0,0,0,.6)] sm:p-6">
-        <MatrixField seed={line.cipher} heat={pulse ? 0.5 : 0} />
+      <div ref={panelRef} onClick={(e) => e.stopPropagation()} onMouseMove={onPanelMove}
+        className={`relative mx-auto w-fit max-w-full overflow-hidden border-4 border-[#ffd100] bg-[#0d0107] p-4 shadow-[12px_12px_0_rgba(0,0,0,.6)] sm:p-6 ${tier >= 2 ? 'panel-quake' : ''}`}>
+        <MatrixField seed={line.cipher} heat={heat} />
+        <div ref={coinsRef} className="coin-host pointer-events-none absolute inset-0 z-20" />
 
         <div className="relative z-10 mb-4 flex items-center gap-3">
           <span className="font-mono text-[10px] text-[#f4e4c1]/45">🔑 {E.toString()} · {shorten(N.toString(), 10)}</span>
@@ -283,29 +435,36 @@ export function InspectFactory({ message, keypair, onClose }) {
         <div className="relative z-10 overflow-x-auto">
           <div className="grid w-max" style={{ gridTemplateColumns: 'auto 4rem auto 4rem auto', gridTemplateRows: 'auto 7rem auto' }}>
 
-            <Station n="1" tone="hot" footer={<DeskLamp lit={!!pulse} />}>
-              <textarea value={draft} onChange={(e) => { setDraft(e.target.value); setRay(null); setSealAt(null); setPulse(Date.now()) }} rows={3}
+            <Station n={<Counter value={wpm} hot={tier >= 1} rage={tier >= 2} />} tone="hot"
+              footer={<DeskLamp lit={!!pulse} />}
+              rail={<><GloryGauge wpm={wpm} ratchet={ratchet} />{tip && <span className="tip-bubble">{tooltipLine()}</span>}</>}>
+              <textarea value={draft} rows={3}
+                onChange={(e) => {
+                  setDraft(e.target.value); setRay(null); setSealAt(null); setPulse(Date.now())
+                  feed(e.target.value.length)
+                  if (heat > 0.4 && Math.random() < 0.15) burstCoin()
+                }}
                 className="w-full resize-none bg-transparent font-mono text-[11px] text-white caret-[#ffd100] outline-none" />
               <div className="mt-1 h-1.5 w-full bg-black/50">
                 <div className={`h-full transition-all ${over ? 'bg-[#ff2d78]' : fuel < 0.75 ? 'bg-[#2dd4bf]' : 'bg-[#ffd100]'}`} style={{ width: `${fuel * 100}%` }} />
               </div>
             </Station>
-            <Pipe digits={bits(line.m, 6)} dead={broken(2)} />
+            <Pipe digits={bits(line.m, 6)} heat={heat} dead={broken(2)} />
             <Station n="2" tone={toneOf(2)} innerRef={refs.pack} seal={!broken(2)} onSeal={() => setSealAt(sealAt === 2 ? null : 2)}>
               <Digits value={line.m} rogueAt={rogueOf('pack', line.m)} />
             </Station>
-            <Pipe digits={bits(line.cipher, 6)} dead={broken(3)} />
+            <Pipe digits={bits(line.cipher, 6)} heat={heat} dead={broken(3)} />
             <Station n="3" tone={toneOf(3)} innerRef={refs.lock} seal={!broken(3)} onSeal={() => setSealAt(sealAt === 3 ? null : 3)}>
               <Digits value={line.cipher} rogueAt={rogueOf('lock', line.cipher)} />
             </Station>
 
-            <div className="col-span-4 grid translate-y-2 place-items-center" ref={starRef}><RayStar armed={!!ray} onFire={fire} /></div>
-            <div className="grid place-items-center"><Pipe digits={bits(line.wire, 4)} reversed dead={broken(4)} className="pipe-v" /></div>
+            <div className="col-span-4 grid translate-y-2 place-items-center" ref={starRef}><RayStar armed={!!ray} onFire={fire} eye={tier >= 2 ? Math.min(1, (wpm - 100) / 30 + 0.35) : 0} gaze={gaze} /></div>
+            <div className="grid place-items-center"><Pipe digits={bits(line.wire, 4)} heat={heat} reversed dead={broken(4)} className="pipe-v" /></div>
 
             <Station n="5" tone={toneOf(5)} seal={line.sigOk} onSeal={() => setSealAt(sealAt === 5 ? null : 5)}>
               {line.recovered || '□□□'}
             </Station>
-            <Pipe digits={bits(line.wire, 10)} reversed dead={broken(5)} className="col-span-3" />
+            <Pipe digits={bits(line.wire, 10)} heat={heat} reversed dead={broken(5)} className="col-span-3" />
             <Station n="4" tone={toneOf(4)} innerRef={refs.wire} seal={!broken(4)} onSeal={() => setSealAt(sealAt === 4 ? null : 4)}>
               <Digits value={line.wire} rogueAt={rogueOf('wire', line.wire)} />
             </Station>
