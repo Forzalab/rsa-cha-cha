@@ -10,6 +10,11 @@ import { BOT_ID, displayName } from './lib/names.js'
 import { ping, unlockPing } from './lib/ping.js'
 import { CipherReveal } from './components/CipherReveal.jsx'
 import { PropagandaFrame } from './components/PropagandaFrame.jsx'
+import { InspectFactory, OvaltineAd, SidebarAd } from './components/InspectFactory.jsx'
+
+const [inspecting, setInspecting] = useState(null)
+const [adGate, setAdGate] = useState(false)
+const [sideAdGone, setSideAdGone] = useState(false)
 
 const MAX_MESSAGE_LENGTH = 500
 const SEND_COOLDOWN_MS = 400
@@ -363,6 +368,7 @@ export default function App() {
             ))}
           </div>
           <div className="mt-auto space-y-3">
+          {!sideAdGone && <SidebarAd onDismiss={() => setSideAdGone(true)} />}
             <button type="button" tabIndex={showNewMessages ? 0 : -1} aria-hidden={!showNewMessages} onClick={() => scrollToNewest()} className={`flex w-full items-center justify-center gap-2 border-2 border-[#4a0410] bg-[#ffd100] px-3 py-2.5 text-xs font-bold text-[#4a0410] shadow-[0_3px_0_#4a0410] transition-all duration-300 hover:-translate-y-0.5 ${showNewMessages ? 'new-message-badge opacity-100' : 'pointer-events-none translate-y-2 opacity-0'}`}><ArrowDown size={14} /> View new messages</button>
 
           </div>
@@ -470,6 +476,7 @@ export default function App() {
                     <button type="button" onClick={(event) => { event.stopPropagation(); setOpenReactions(reactionTrayOpen ? null : message.id) }} className={`react-nub react-idle grid h-7 w-7 shrink-0 place-items-center rounded-full border border-[#ffd100]/35 bg-[#3d0510] text-[#ffd100]/70 shadow-lg shadow-black/50 hover:border-[#ffd100] hover:bg-[#ffd100] hover:text-[#4a0410] ${reactions.length || reactionTrayOpen || message.id === lastIncomingId
                       ? 'opacity-100'
                       : 'opacity-0 group-hover/message:opacity-100 focus-visible:opacity-100'}`} aria-label="View and add reactions"><SmilePlus size={14} /></button>
+                      <button type="button" onClick={(event) => { event.stopPropagation(); setInspecting(message); setAdGate(true) }} className={`react-nub grid h-7 w-7 shrink-0 place-items-center rounded-full border border-[#ffd100]/35 bg-[#3d0510] font-mono text-xs font-bold text-[#ffd100]/70 shadow-lg shadow-black/50 hover:border-[#ffd100] hover:bg-[#ffd100] hover:text-[#4a0410] ${message.id === lastIncomingId || !next ? 'opacity-100' : 'opacity-0 group-hover/message:opacity-100 focus-visible:opacity-100'}`} aria-label="Inspect the RSA pipeline for this message">?</button>
                     {reactionTrayOpen && (
                       <div onClick={(event) => event.stopPropagation()} className={`reaction-pop absolute bottom-9 z-30 min-w-52 rounded-2xl border border-amber-200/10 bg-[#1b181f]/95 p-2 shadow-2xl shadow-black/50 backdrop-blur-xl ${own ? 'right-0' : 'left-0'}`}>
                         {reactions.length > 0 && <p className="px-2 pb-1.5 text-[10px] font-semibold uppercase tracking-[.16em] text-[#f4e4c1]/45">Reactions</p>}
@@ -523,6 +530,8 @@ export default function App() {
           </form>
         </div>
       </section>
+      {inspecting && adGate && <OvaltineAd onSkip={() => setAdGate(false)} />}
+{inspecting && !adGate && <InspectFactory message={inspecting} keypair={chat.keypair} onClose={() => setInspecting(null)} />}
     </main>
   )
 }
