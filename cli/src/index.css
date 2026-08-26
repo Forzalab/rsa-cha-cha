@@ -621,14 +621,14 @@ summary, [role="button"] { cursor: pointer; }
 .matrix-col {
   position: absolute; top: 0; width: 1ch;
   font-family: 'Space Mono', monospace; font-size: 12px; line-height: 1.15;
-  color: #2dd4bf; opacity: .18; text-shadow: 0 0 8px rgba(45,212,191,.9);
+  color: #2dd4bf; opacity: .10; text-shadow: 0 0 8px rgba(45,212,191,.55);
   word-break: break-all; white-space: normal;
   animation-name: matrix-fall; animation-timing-function: linear; animation-iteration-count: infinite;
 }
 @keyframes matrix-fall {
   0%   { transform: translateY(-100%); opacity: 0; }
-  10%  { opacity: .28; }
-  85%  { opacity: .18; }
+  10%  { opacity: 1; }
+  85%  { opacity: 1; }
   100% { transform: translateY(115%); opacity: 0; }
 }
 
@@ -651,9 +651,9 @@ summary, [role="button"] { cursor: pointer; }
 .pipe-rev .pipe-fluid { animation-direction: reverse; }
 @keyframes fluid-run { to { background-position: 16px 0; } }
 .pipe-bit {
-  position: absolute; left: -8%;
+  position: absolute; left: -8%; transform: none; rotate: none; writing-mode: horizontal-tb;
   font-family: 'Space Mono', monospace; font-size: 11px; font-weight: 700;
-  color: #ffe873; text-shadow: 0 0 7px rgba(255,209,0,.95);
+  color: #ffe873; text-shadow: 0 0 7px rgba(255,209,0,.95), 0 0 14px rgba(0,0,0,.95); z-index: 2;
   animation: bit-drift 2.5s linear infinite;
 }
 .pipe-rev .pipe-bit { animation-name: bit-drift-rev; }
@@ -684,26 +684,20 @@ summary, [role="button"] { cursor: pointer; }
   100% { box-shadow: 6px 6px 0 rgba(0,0,0,.6), 0 0 6px 1px rgba(255,209,0,.3); }
 }
 
-/* caged mineshaft lamp */
-.lamp { position: absolute; left: 50%; top: -30px; margin-left: -12px; width: 24px; height: 30px;
-  transform-origin: 50% 0; z-index: 12; }
-.lamp-cord { position: absolute; left: 11px; top: -14px; width: 2px; height: 16px; background: #5a4a2e; }
-.lamp-body { width: 24px; height: 30px; }
-.lamp-bulb { fill: #4a3a18; }
-.lamp-cone { position: absolute; left: -14px; top: 24px; width: 52px; height: 44px; opacity: 0;
-  background: radial-gradient(ellipse at 50% 0%, rgba(255,209,0,.45), transparent 70%); }
-.lamp-flare { animation: lamp-swing 1.4s ease-in-out; }
-.lamp-flare .lamp-bulb { animation: bulb-warm .7s ease-out; }
-.lamp-flare .lamp-cone { animation: cone-warm .7s ease-out; }
-@keyframes lamp-swing { 0%,100% { transform: rotate(0) } 25% { transform: rotate(9deg) } 60% { transform: rotate(-6deg) } }
-@keyframes bulb-warm { 0% { fill: #4a3a18 } 40% { fill: #fff3b0 } 100% { fill: #4a3a18 } }
-@keyframes cone-warm { 0% { opacity: 0 } 35% { opacity: 1 } 100% { opacity: 0 } }
-.lamp-alarm { animation: lamp-swing 1.1s ease-in-out infinite; }
-.lamp-alarm .lamp-bulb { animation: bulb-alarm .5s steps(2) infinite; }
-.lamp-alarm .lamp-cone { animation: cone-alarm .5s steps(2) infinite;
-  background: radial-gradient(ellipse at 50% 0%, rgba(255,45,120,.5), transparent 70%); }
-@keyframes bulb-alarm { 0% { fill: #ff2d78 } 100% { fill: #3a0a18 } }
-@keyframes cone-alarm { 0% { opacity: 1 } 100% { opacity: .05 } }
+/* desk lamp -- hangs from the bottom edge of station 1, nothing else */
+.desklamp { position: absolute; left: 50%; bottom: -34px; margin-left: -12px;
+  width: 24px; height: 34px; transform-origin: 50% 0; z-index: 12; }
+.desklamp-cord { position: absolute; left: 11px; top: -6px; width: 2px; height: 8px; background: #5a4a2e; }
+.desklamp-body { width: 24px; height: 30px; margin-top: 4px; }
+.desklamp-bulb { fill: #4a3a18; }
+.desklamp-cone { position: absolute; left: -16px; top: 30px; width: 56px; height: 40px; opacity: 0;
+  background: radial-gradient(ellipse at 50% 0%, rgba(255,209,0,.4), transparent 70%); }
+.desklamp-flare { animation: desklamp-swing 1.5s ease-in-out; }
+.desklamp-flare .desklamp-bulb { animation: desklamp-warm .8s ease-out; }
+.desklamp-flare .desklamp-cone { animation: desklamp-cone .8s ease-out; }
+@keyframes desklamp-swing { 0%,100% { transform: rotate(0) } 25% { transform: rotate(8deg) } 62% { transform: rotate(-6deg) } }
+@keyframes desklamp-warm { 0% { fill: #4a3a18 } 40% { fill: #fff3b0 } 100% { fill: #4a3a18 } }
+@keyframes desklamp-cone { 0% { opacity: 0 } 35% { opacity: 1 } 100% { opacity: 0 } }
 
 /* damage */
 .rogue { color: #ff2d78; font-weight: 800; animation: rogue-flash .4s steps(2) infinite; }
@@ -745,6 +739,6 @@ summary, [role="button"] { cursor: pointer; }
 
 @media (prefers-reduced-motion: reduce) {
   .matrix-col, .pipe-fluid, .pipe-bit, .station-live .station-plate, .station-hit .station-plate,
-  .lamp, .lamp-flare, .lamp-alarm, .lamp-alarm .lamp-bulb, .lamp-alarm .lamp-cone,
+  .desklamp, .desklamp-flare, .desklamp-flare .desklamp-bulb, .desklamp-flare .desklamp-cone,
   .rogue, .smoke, .seal-panic, .star-outer, .star-inner, .ad-swap { animation: none !important; }
 }

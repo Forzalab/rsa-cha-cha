@@ -105,20 +105,29 @@ function Digits({ value, rogueAt }) {
 
 // ---------------------------------------------------------------- parts
 
-function Lamp({ mode }) {           // 'off' | 'flare' | 'alarm'
+// One lamp only, and it hangs off the bottom of the WRITE box. Swings and
+// runs hot while the operator types.
+function DeskLamp({ lit }) {
   return (
-    <div className={`lamp ${mode === 'alarm' ? 'lamp-alarm' : mode === 'flare' ? 'lamp-flare' : ''}`}>
-      <span className="lamp-cord" />
-      <svg viewBox="0 0 24 30" className="lamp-body">
-        <path d="M8 5h8l2 3H6z" fill="#5a4a2e" />
-        <ellipse className="lamp-bulb" cx="12" cy="16" rx="6" ry="7" />
-        <path d="M6 9h12v13a6 6 0 0 1-12 0z" fill="none" stroke="#6b5836" strokeWidth="1.2" />
-        <path d="M12 9v13M7 12h10M7 17h10" stroke="#6b5836" strokeWidth=".8" />
+    <div className={`desklamp ${lit ? 'desklamp-flare' : ''}`}>
+      <span className="desklamp-cord" />
+      <svg viewBox="0 0 24 30" className="desklamp-body">
+        <path d="M8 25h8l2-3H6z" fill="#5a4a2e" />
+        <ellipse className="desklamp-bulb" cx="12" cy="14" rx="6" ry="7" />
+        <path d="M6 8h12v13a6 6 0 0 1-12 0z" fill="none" stroke="#6b5836" strokeWidth="1.2" />
+        <path d="M12 8v13M7 12h10M7 17h10" stroke="#6b5836" strokeWidth=".8" />
       </svg>
-      <span className="lamp-cone" />
+      <span className="desklamp-cone" />
     </div>
   )
 }
+
+const MarkOk = () => (
+  <svg viewBox="0 0 12 12" className="h-2.5 w-2.5"><path d="M2 6.2l2.6 2.6L10 3" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+)
+const MarkBad = () => (
+  <svg viewBox="0 0 12 12" className="h-2.5 w-2.5"><path d="M6 2v5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" /><circle cx="6" cy="10" r="1.2" fill="currentColor" /></svg>
+)
 
 function Pipe({ digits, reversed = false, dead = false, className = '' }) {
   return (
@@ -131,10 +140,9 @@ function Pipe({ digits, reversed = false, dead = false, className = '' }) {
   )
 }
 
-function Station({ n, tone, lamp, seal, onSeal, innerRef, children }) {
+function Station({ n, tone, seal, onSeal, innerRef, footer, children }) {
   return (
     <div ref={innerRef} className={`station relative z-10 w-44 shrink-0 ${tone === 'danger' ? 'station-hit' : tone === 'hot' ? 'station-live' : ''}`}>
-      <Lamp mode={lamp} />
       <div className="station-plate">
         <span className="rivet" style={{ left: 4, top: 4 }} /><span className="rivet" style={{ right: 4, top: 4 }} />
         <span className="rivet" style={{ left: 4, bottom: 4 }} /><span className="rivet" style={{ right: 4, bottom: 4 }} />
@@ -144,12 +152,13 @@ function Station({ n, tone, lamp, seal, onSeal, innerRef, children }) {
           {seal != null && (
             <button type="button" onClick={onSeal} aria-label="signature"
               className={`ml-auto grid h-5 w-5 place-items-center rounded-full border font-mono text-[9px] font-black ${seal ? 'border-[#2dd4bf] bg-[#2dd4bf]/15 text-[#2dd4bf]' : 'seal-panic border-[#ff2d78] bg-[#ff2d78]/20 text-[#ff2d78]'}`}>
-              {seal ? '✓' : '!'}
+              {seal ? <MarkOk /> : <MarkBad />}
             </button>
           )}
         </div>
         <div className="h-20 overflow-y-auto break-all p-2 font-mono text-[10px] leading-4 text-[#fff6dc]/85">{children}</div>
       </div>
+      {footer}
       {tone === 'danger' && <>
         <span className="smoke" style={{ left: '20%' }} />
         <span className="smoke" style={{ left: '48%', animationDelay: '.55s' }} />
@@ -175,7 +184,7 @@ function RayStar({ armed, onFire }) {
   )
 }
 
-function MatrixField({ seed }) {
+function MatrixField({ seed, heat = 0 }) {
   const cols = useMemo(() => Array.from({ length: 22 }, (_, c) => ({
     left: `${(c * 100) / 22}%`,
     delay: `${(c * 0.31) % 4}s`,
@@ -185,7 +194,7 @@ function MatrixField({ seed }) {
   return (
     <div className="matrix-field pointer-events-none absolute inset-0 z-0 overflow-hidden">
       {cols.map((c, i) => (
-        <span key={i} className="matrix-col" style={{ left: c.left, animationDelay: c.delay, animationDuration: c.dur }}>{c.text}</span>
+        <span key={i} className="matrix-col" style={{ left: c.left, animationDelay: c.delay, animationDuration: c.dur, opacity: 0.10 + heat * 0.26, color: heat > 0.05 ? `rgb(${Math.round(45 + heat * 210)},${Math.round(212 + heat * 20)},${Math.round(191 - heat * 76)})` : undefined }}>{c.text}</span>
       ))}
     </div>
   )
@@ -232,7 +241,6 @@ export function InspectFactory({ message, keypair, onClose }) {
   const hitStage = ray ? STAGE_OF[ray.target] : Infinity
   const broken = (stage) => stage >= hitStage
   const toneOf = (stage) => (broken(stage) ? 'danger' : 'idle')
-  const lampOf = (stage) => (broken(stage) ? 'alarm' : pulse && stage >= 2 ? 'flare' : 'off')
   const rogueOf = (t, v) => (ray?.target === t ? Math.min(ray.at, String(v).length - 1) : null)
 
   useEffect(() => {
@@ -265,7 +273,7 @@ export function InspectFactory({ message, keypair, onClose }) {
   return (
     <div className="fixed inset-0 z-[60] overflow-y-auto bg-black/90 p-3 sm:p-8" onClick={onClose}>
       <div ref={panelRef} onClick={(e) => e.stopPropagation()} className="relative mx-auto w-fit max-w-full overflow-hidden border-4 border-[#ffd100] bg-[#0d0107] p-4 shadow-[12px_12px_0_rgba(0,0,0,.6)] sm:p-6">
-        <MatrixField seed={line.cipher} />
+        <MatrixField seed={line.cipher} heat={pulse ? 0.5 : 0} />
 
         <div className="relative z-10 mb-4 flex items-center gap-3">
           <span className="font-mono text-[10px] text-[#f4e4c1]/45">🔑 {E.toString()} · {shorten(N.toString(), 10)}</span>
@@ -275,7 +283,7 @@ export function InspectFactory({ message, keypair, onClose }) {
         <div className="relative z-10 overflow-x-auto">
           <div className="grid w-max" style={{ gridTemplateColumns: 'auto 4rem auto 4rem auto', gridTemplateRows: 'auto 7rem auto' }}>
 
-            <Station n="1" tone="hot" lamp={pulse ? 'flare' : 'off'}>
+            <Station n="1" tone="hot" footer={<DeskLamp lit={!!pulse} />}>
               <textarea value={draft} onChange={(e) => { setDraft(e.target.value); setRay(null); setSealAt(null); setPulse(Date.now()) }} rows={3}
                 className="w-full resize-none bg-transparent font-mono text-[11px] text-white caret-[#ffd100] outline-none" />
               <div className="mt-1 h-1.5 w-full bg-black/50">
@@ -283,22 +291,22 @@ export function InspectFactory({ message, keypair, onClose }) {
               </div>
             </Station>
             <Pipe digits={bits(line.m, 6)} dead={broken(2)} />
-            <Station n="2" tone={toneOf(2)} lamp={lampOf(2)} innerRef={refs.pack} seal={!broken(2)} onSeal={() => setSealAt(sealAt === 2 ? null : 2)}>
+            <Station n="2" tone={toneOf(2)} innerRef={refs.pack} seal={!broken(2)} onSeal={() => setSealAt(sealAt === 2 ? null : 2)}>
               <Digits value={line.m} rogueAt={rogueOf('pack', line.m)} />
             </Station>
             <Pipe digits={bits(line.cipher, 6)} dead={broken(3)} />
-            <Station n="3" tone={toneOf(3)} lamp={lampOf(3)} innerRef={refs.lock} seal={!broken(3)} onSeal={() => setSealAt(sealAt === 3 ? null : 3)}>
+            <Station n="3" tone={toneOf(3)} innerRef={refs.lock} seal={!broken(3)} onSeal={() => setSealAt(sealAt === 3 ? null : 3)}>
               <Digits value={line.cipher} rogueAt={rogueOf('lock', line.cipher)} />
             </Station>
 
-            <div className="col-span-4 grid place-items-center" ref={starRef}><RayStar armed={!!ray} onFire={fire} /></div>
+            <div className="col-span-4 grid translate-y-2 place-items-center" ref={starRef}><RayStar armed={!!ray} onFire={fire} /></div>
             <div className="grid place-items-center"><Pipe digits={bits(line.wire, 4)} reversed dead={broken(4)} className="pipe-v" /></div>
 
-            <Station n="5" tone={toneOf(5)} lamp={lampOf(5)} seal={line.sigOk} onSeal={() => setSealAt(sealAt === 5 ? null : 5)}>
+            <Station n="5" tone={toneOf(5)} seal={line.sigOk} onSeal={() => setSealAt(sealAt === 5 ? null : 5)}>
               {line.recovered || '□□□'}
             </Station>
             <Pipe digits={bits(line.wire, 10)} reversed dead={broken(5)} className="col-span-3" />
-            <Station n="4" tone={toneOf(4)} lamp={lampOf(4)} innerRef={refs.wire} seal={!broken(4)} onSeal={() => setSealAt(sealAt === 4 ? null : 4)}>
+            <Station n="4" tone={toneOf(4)} innerRef={refs.wire} seal={!broken(4)} onSeal={() => setSealAt(sealAt === 4 ? null : 4)}>
               <Digits value={line.wire} rogueAt={rogueOf('wire', line.wire)} />
             </Station>
           </div>
