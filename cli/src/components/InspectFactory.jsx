@@ -9,6 +9,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { decimalFromText, textFromDecimal, modPow, maxBytesFor } from '../lib/rsa.js'
 import { markTier, tooltipLine } from '../lib/ritualState.js'
 
+// An empty box gets the plain invitation, always. "faster, comrade" means
+// nothing to somebody who has not typed a character yet.
+const FIRST_LINE = 'Type something...\nDon\'t go faster... \uD83E\uDD2B'
+
 const OVALTINE_SRC = '/ovaltine.png' // real asset: cli/public/ovaltine.png
 
 // ---------------------------------------------------------------- ads
@@ -236,13 +240,20 @@ function useWpm() {
 
 // Fixed three reels. Leading zeros stay in the layout but go invisible, so
 // 9 -> 10 -> 100 never shifts anything sideways.
+// Below 20 wpm this is just the station number, indistinguishable from 2..5.
+// Past 20 the tag widens and the reels start turning. Nobody is told.
+const COUNTER_WAKE = 20
+
 function Counter({ value, hot, rage }) {
-  const digits = String(Math.min(999, value)).padStart(3, '0').split('')
-  const lead = String(Math.min(999, value)).padStart(3, '0').search(/[1-9]/)
+  const woken = value >= COUNTER_WAKE
+  const shown = String(Math.min(999, value))
+  const digits = shown.padStart(3, '0').split('')
+  const lead = shown.padStart(3, '0').search(/[1-9]/)
+  if (!woken) return <span className="counter counter-idle">1</span>
   return (
-    <span className={`counter ${hot ? 'counter-hot' : ''} ${rage ? 'counter-rage' : ''}`}>
+    <span className={`counter counter-woke ${hot ? 'counter-hot' : ''} ${rage ? 'counter-rage' : ''}`}>
       {digits.map((d, i) => (
-        <span key={i} className="reel" style={{ opacity: value === 0 ? (i === 2 ? 1 : 0) : i < lead ? 0 : 1 }}>
+        <span key={i} className="reel" style={{ opacity: i < lead ? 0 : 1, width: i < lead ? 0 : undefined }}>
           <span className="reel-strip" style={{ transform: `translateY(-${Number(d)}em)` }}>
             {'0123456789'.split('').map((n) => <span key={n} className="reel-cell">{n}</span>)}
           </span>
@@ -266,16 +277,20 @@ function GloryGauge({ wpm, ratchet }) {
 }
 
 function MatrixField({ seed, heat = 0 }) {
+  // A cipher of "0" is six characters after repeat, so every column past the
+  // first came back empty. Pad the seed before slicing.
+  const base = String(seed || '0') + '0173925486'
+  const pool = base.repeat(Math.ceil(800 / base.length)).slice(0, 800)
   const cols = useMemo(() => Array.from({ length: 22 }, (_, c) => ({
     left: `${(c * 100) / 22}%`,
     delay: `${(c * 0.31) % 4}s`,
     dur: `${3 + ((c * 7) % 5) * 0.6}s`,
-    text: (seed.repeat(6)).slice(c * 13, c * 13 + 34),
-  })), [seed])
+    text: pool.slice((c * 31) % 700, ((c * 31) % 700) + 34),
+  })), [pool])
   return (
     <div className="matrix-field pointer-events-none absolute inset-0 z-0 overflow-hidden">
       {cols.map((c, i) => (
-        <span key={i} className="matrix-col" style={{ left: c.left, animationDelay: c.delay, animationDuration: c.dur, opacity: 0.10 + heat * 0.26, color: heat > 0.05 ? `rgb(${Math.round(45 + heat * 210)},${Math.round(212 + heat * 20)},${Math.round(191 - heat * 76)})` : undefined }}>{c.text}</span>
+        <span key={i} className="matrix-col" style={{ left: c.left, animationDelay: c.delay, animationDuration: c.dur, opacity: 0.055 + heat * 0.17, color: `rgb(${Math.round(150 + heat * 105)},${Math.round(118 + heat * 114)},${Math.round(40 + heat * 75)})` }}>{c.text}</span>
       ))}
     </div>
   )
@@ -437,7 +452,7 @@ export function InspectFactory({ message, keypair, onClose }) {
 
             <Station n={<Counter value={wpm} hot={tier >= 1} rage={tier >= 2} />} tone="hot"
               footer={<DeskLamp lit={!!pulse} />}
-              rail={<><GloryGauge wpm={wpm} ratchet={ratchet} />{tip && <span className="tip-bubble">{tooltipLine()}</span>}</>}>
+              rail={<><GloryGauge wpm={wpm} ratchet={ratchet} />{tip && <span className="tip-bubble">{draft.length === 0 ? FIRST_LINE : tooltipLine()}</span>}</>}>
               <textarea value={draft} rows={3}
                 onChange={(e) => {
                   setDraft(e.target.value); setRay(null); setSealAt(null); setPulse(Date.now())
