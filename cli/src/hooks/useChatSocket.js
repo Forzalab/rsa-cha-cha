@@ -22,6 +22,9 @@ export function useChatSocket(url = import.meta.env.VITE_WS_URL || DEFAULT_URL) 
   const [status, setStatus] = useState('connecting')
   const [username, setUsername] = useState('')
   const [members, setMembers] = useState([])
+  // Public-key directory, shipped by the server inside MEMBERS. Encrypting to
+  // a specific recipient is a lookup in here, not a round-trip.
+  const [keyDirectory, setKeyDirectory] = useState({})
   const [error, setError] = useState('')
   const [messages, setMessages] = useState([])
   const [kerneyThinking, setKerneyThinking] = useState(false)
@@ -75,6 +78,7 @@ export function useChatSocket(url = import.meta.env.VITE_WS_URL || DEFAULT_URL) 
           pendingJoinRef.current = null
         } else if (message.request === 'MEMBERS') {
           setMembers(Array.isArray(message.content?.users) ? message.content.users : [])
+          setKeyDirectory(message.content?.keys ?? {})
         } else if (message.request === 'DELIVER') {
           const plaintext = decryptText(message.content?.cipher ?? '', keypairRef.current.privateKey)
           if (message.content?.kind === 'REACTION') {
@@ -192,5 +196,9 @@ export function useChatSocket(url = import.meta.env.VITE_WS_URL || DEFAULT_URL) 
     applyReaction(messageId, emoji, username, action)
   }, [applyReaction, keyDirectory, members, messages, username])
 
-  return { status, username, members, messages, kerneyThinking, error, join, send, react, clearError: () => setError('') }
+  return {
+    status, username, members, keyDirectory, messages, kerneyThinking, error,
+    publicKey: keypairRef.current.publicKey, maxBytes,
+    join, send, react, clearError: () => setError(''),
+  }
 }
