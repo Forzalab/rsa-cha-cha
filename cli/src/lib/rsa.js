@@ -12,7 +12,7 @@ export const MILLER_RABIN_ROUNDS = 5
 
 // ---------------------------------------------------------------- big-int math
 
-function modPow(base, exponent, modulus) {
+export function modPow(base, exponent, modulus) {
   let result = 1n
   let factor = BigInt(base) % BigInt(modulus)
   let power = BigInt(exponent)

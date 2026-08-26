@@ -44,7 +44,6 @@ export function useChatSocket(url = import.meta.env.VITE_WS_URL || DEFAULT_URL) 
       return {
         ...message,
         reactions: { ...message.reactions, [emoji]: [...reactedBy, sender] },
-        publicKey: keypairRef.current.publicKey, keypair: keypairRef.current, maxBytes,
       }
     }))
   }, [])
