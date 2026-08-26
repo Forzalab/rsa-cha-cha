@@ -199,7 +199,7 @@ export function useChatSocket(url = import.meta.env.VITE_WS_URL || DEFAULT_URL) 
 
   return {
     status, username, members, keyDirectory, messages, kerneyThinking, error,
-    publicKey: keypairRef.current.publicKey, maxBytes,
+    publicKey: keypairRef.current.publicKey, keypair: keypairRef.current, maxBytes,
     join, send, react, clearError: () => setError(''),
   }
 }

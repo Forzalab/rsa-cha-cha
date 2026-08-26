@@ -12,10 +12,6 @@ import { CipherReveal } from './components/CipherReveal.jsx'
 import { PropagandaFrame } from './components/PropagandaFrame.jsx'
 import { InspectFactory, OvaltineAd, SidebarAd } from './components/InspectFactory.jsx'
 
-const [inspecting, setInspecting] = useState(null)
-const [adGate, setAdGate] = useState(false)
-const [sideAdGone, setSideAdGone] = useState(false)
-
 const MAX_MESSAGE_LENGTH = 500
 const SEND_COOLDOWN_MS = 400
 
@@ -185,6 +181,9 @@ export default function App() {
   // first roster is the room as it already was — announcing it would be noise.
   const [notices, setNotices] = useState([])
   const [freshMembers, setFreshMembers] = useState([])
+  const [inspecting, setInspecting] = useState(null)
+  const [adGate, setAdGate] = useState(false)
+  const [sideAdGone, setSideAdGone] = useState(false)
   // One state machine for the whole frame. Overlapping triggers cannot stack
   // because every transition is scheduled off a single stage value.
   const [frameStage, setFrameStage] = useState('idle')
