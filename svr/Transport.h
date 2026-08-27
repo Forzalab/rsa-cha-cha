@@ -11,6 +11,7 @@
 #include <boost/beast/core.hpp>
 #include <boost/beast/websocket.hpp>
 #include <nlohmann/json.hpp>
+#include "Bridge.h"
 #include "LLM.h"
 
 #include <algorithm>
@@ -62,6 +63,7 @@ class Session : public std::enable_shared_from_this<Session> {
     bool allow_send(const json& msg);
     bool allow_ai();
     void post_ai_reply(GeminiReply reply, std::string message_id);
+    void post_bridge_reply(BridgeReply reply);
 
    private:
     void on_accept(bb::error_code ec);
@@ -114,6 +116,7 @@ class Hub {
     void do_lookup(const std::shared_ptr<Session>&, const json&);
     void do_send(const std::shared_ptr<Session>&, const json&);
     void do_ai(const std::shared_ptr<Session>&, const json&);
+    void do_bridges(const std::shared_ptr<Session>&);
     void announce_members();
 
     std::map<std::string, Entry> dir_;
@@ -207,6 +210,14 @@ inline void Session::post_ai_reply(GeminiReply reply, std::string message_id) {
     });
 }
 
+inline void Session::post_bridge_reply(BridgeReply reply) {
+    bo::post(ws_.get_executor(), [self = shared_from_this(), reply = std::move(reply)] {
+        self->send(reply.ok
+            ? envelope("SERVER", self->userid(), "BRIDGES_URL", {{"url", reply.url}})
+            : envelope("SERVER", self->userid(), "ERR_BRIDGES", {{"detail", reply.detail}}));
+    });
+}
+
 inline void Session::do_write() {
     ws_.async_write(bo::buffer(out_.front()),
                     bb::bind_front_handler(&Session::on_write, shared_from_this()));
@@ -247,6 +258,8 @@ inline void Hub::route(const std::shared_ptr<Session>& from, const std::string& 
             do_send(from, msg);
     } else if (request == "AI_KERNEY") {
         do_ai(from, msg);
+    } else if (request == "BRIDGES") {
+        do_bridges(from);
     } else {
         from->send(envelope("SERVER", from->userid(), "ERR_UNSPC"));
     }
@@ -279,6 +292,12 @@ inline void Hub::do_ai(const std::shared_ptr<Session>& from, const json& msg) {
     std::thread([from, username = from->userid(), prompt, message_id] {
         from->post_ai_reply(ask_kerney(username, prompt), message_id);
     }).detach();
+}
+
+// One click, one POST, one answer, to the tab that asked. Nobody else in the
+// room cares that somebody opened a graph.
+inline void Hub::do_bridges(const std::shared_ptr<Session>& from) {
+    std::thread([from] { from->post_bridge_reply(make_visualization()); }).detach();
 }
 
 inline void Hub::broadcast_ai(const GeminiReply& reply, const std::string& message_id) {

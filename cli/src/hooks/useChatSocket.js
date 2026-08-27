@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { errorText, joinMessage, kerneyRequest, parseFrame, sendMessage } from '../lib/protocol.js'
+import { bridgesRequest, errorText, joinMessage, kerneyRequest, parseFrame, sendMessage } from '../lib/protocol.js'
 import { decryptText, encryptText, generateKeypair, maxBytesFor } from '../lib/rsa.js'
 import { isRosas, randomMandarinPhrase } from '../lib/rosasMode.js'
 
@@ -17,6 +17,9 @@ export function useChatSocket(url = import.meta.env.VITE_WS_URL || DEFAULT_URL) 
   const socketRef = useRef(null)
   const pendingJoinRef = useRef(null)
   const lastSendAtRef = useRef(0)
+  // One BRIDGES round trip in flight at a time. The callback is stashed here
+  // rather than in state so the socket handler never needs to be re-bound.
+  const bridgePendingRef = useRef(null)
   // One keypair per browser tab, generated on mount. The private half never
   // touches the socket -- only publicKey goes out, inside JOIN.
   const keypairRef = useRef(null)
@@ -84,6 +87,12 @@ export function useChatSocket(url = import.meta.env.VITE_WS_URL || DEFAULT_URL) 
           setError('')
           pendingJoinRef.current?.resolve()
           pendingJoinRef.current = null
+        } else if (message.request === 'BRIDGES_URL' || message.request === 'ERR_BRIDGES') {
+          const done = bridgePendingRef.current
+          bridgePendingRef.current = null
+          done?.(message.request === 'BRIDGES_URL'
+            ? { ok: true, url: message.content?.url ?? '' }
+            : { ok: false, detail: message.content?.detail || errorText('ERR_BRIDGES') })
         } else if (message.request === 'MEMBERS') {
           setMembers(Array.isArray(message.content?.users) ? message.content.users : [])
           setKeyDirectory(message.content?.keys ?? {})
@@ -219,6 +228,26 @@ export function useChatSocket(url = import.meta.env.VITE_WS_URL || DEFAULT_URL) 
     return true
   }, [keyDirectory, members, username])
 
+  // The POST to BRIDGES is a blocking curl on the server, so this can take a
+  // couple of seconds. Nothing else in the room stalls; the server runs it off
+  // the loop.
+  const requestBridges = useCallback((done) => {
+    const socket = socketRef.current
+    if (!socket || socket.readyState !== WebSocket.OPEN || !username) {
+      done?.({ ok: false, detail: 'Not connected to the server.' })
+      return
+    }
+    if (bridgePendingRef.current) return
+    bridgePendingRef.current = done
+    socket.send(JSON.stringify(bridgesRequest(username)))
+    window.setTimeout(() => {
+      const late = bridgePendingRef.current
+      if (!late) return
+      bridgePendingRef.current = null
+      late({ ok: false, detail: 'BRIDGES did not answer in time.' })
+    }, 20000)
+  }, [username])
+
   const react = useCallback((messageId, emoji) => {
     const socket = socketRef.current
     if (!socket || socket.readyState !== WebSocket.OPEN || !username) return
@@ -239,6 +268,6 @@ export function useChatSocket(url = import.meta.env.VITE_WS_URL || DEFAULT_URL) 
     status, username, members, keyDirectory, messages, kerneyThinking, error,
     ritualEvent, sendRitual, clearRitual: () => setRitualEvent(null),
     publicKey: keypairRef.current.publicKey, keypair: keypairRef.current, maxBytes,
-    join, send, react, clearError: () => setError(''),
+    join, send, react, requestBridges, clearError: () => setError(''),
   }
 }

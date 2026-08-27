@@ -7,7 +7,19 @@
 // Speed is the priority over key strength here -- this is a class demo on a
 // projector, not a key that guards anything. Both knobs are below.
 
-export const PRIME_DIGITS = 64 // each prime; N ends up ~128 digits
+// Each prime; N lands at roughly twice this. The cap on one block is
+// floor(log256(N)) bytes, which grows linearly with this number -- while a
+// modPow grows about cubically with it. Measured in node, per keypair:
+//
+//    64d -> 52B cap,    5ms keygen,  0.8ms per inspect recompute
+//    96d -> 79B cap,    7ms keygen,  1.9ms
+//   128d -> 106B cap,  32ms keygen,  4.1ms
+//   192d -> 159B cap,  58ms keygen, 10.7ms
+//   256d -> 212B cap, 154ms keygen, 23.7ms   <- 4x the room, 30x the work
+//
+// 64 was also a hard ceiling on the wpm counter: 52 bytes x 2.4 = 125 wpm,
+// and the top tier is 130. The gauge could not physically be filled.
+export const PRIME_DIGITS = 128
 export const MILLER_RABIN_ROUNDS = 5
 
 // ---------------------------------------------------------------- big-int math

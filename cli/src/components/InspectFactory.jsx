@@ -127,6 +127,45 @@ function DeskLamp({ lit }) {
   )
 }
 
+// E and N are what somebody needs to encrypt to you, so they have to leave
+// this panel. navigator.clipboard is gated on a secure context and the site
+// is served over plain http -- the same trap that killed crypto.randomUUID on
+// the first deploy. execCommand is the fallback that still works there.
+function CopyBit({ label, value }) {
+  const [done, setDone] = useState(false)
+  const copy = (event) => {
+    event.stopPropagation()
+    try {
+      if (navigator.clipboard?.writeText) navigator.clipboard.writeText(value)
+      else throw new Error('no clipboard api')
+    } catch {
+      const pad = document.createElement('textarea')
+      pad.value = value
+      pad.setAttribute('readonly', '')
+      pad.style.cssText = 'position:fixed;top:0;left:0;opacity:0'
+      document.body.appendChild(pad)
+      pad.select()
+      try { document.execCommand('copy') } catch { /* nothing left to try */ }
+      pad.remove()
+    }
+    setDone(true)
+    setTimeout(() => setDone(false), 900)
+  }
+  return (
+    <button type="button" onClick={copy} title={`Copy ${value}`} aria-label={`Copy ${value}`} className="copybit">
+      <span>{label}</span>
+      <svg viewBox="0 0 14 14" className="copybit-mark" aria-hidden="true">
+        {done
+          ? <path d="M2.6 7.4l3 3 5.8-6.4" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+          : <>
+              <rect x="4.9" y="4.9" width="6.6" height="6.6" fill="none" stroke="currentColor" strokeWidth="1.2" />
+              <path d="M9.1 2.6H2.5v6.6" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+            </>}
+      </svg>
+    </button>
+  )
+}
+
 const MarkOk = () => (
   <svg viewBox="0 0 12 12" className="h-2.5 w-2.5"><path d="M2 6.2l2.6 2.6L10 3" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
 )
@@ -541,7 +580,10 @@ export function InspectFactory({ message, keypair, onClose, onRitual }) {
         <div ref={coinsRef} className="coin-host pointer-events-none absolute inset-0 z-20" />
 
         <div className="relative z-10 mb-4 flex items-center gap-3">
-          <span className="font-mono text-[10px] text-[#f4e4c1]/45">🔑 {E.toString()} · {shorten(N.toString(), 10)}</span>
+          <span className="font-mono text-[10px] text-[#f4e4c1]/45">🔑</span>
+          <CopyBit label={E.toString()} value={E.toString()} />
+          <span className="font-mono text-[10px] text-[#f4e4c1]/25">·</span>
+          <CopyBit label={shorten(N.toString(), 10)} value={N.toString()} />
           <button type="button" onClick={onClose} aria-label="close" className="ml-auto grid h-7 w-7 place-items-center border-2 border-[#ffd100]/60 font-mono text-[#ffd100] hover:bg-[#ffd100] hover:text-[#4a0410]">×</button>
         </div>
 

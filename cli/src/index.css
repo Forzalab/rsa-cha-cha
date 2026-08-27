@@ -1243,3 +1243,29 @@ summary, [role="button"] { cursor: pointer; }
   .pipe-chevrons { animation: none !important; opacity: 0 !important; }
   .station-console:focus-within .station-plate > div:last-child::before { animation: none !important; }
 }
+
+/* ------------------------------------------------------------ BRIDGES + copy
+   The composer's bridge button pulses only while the server is mid-POST. */
+.bridge-wait { display: grid; place-items: center;
+  animation: bridge-wait 1.05s ease-in-out infinite; }
+@keyframes bridge-wait {
+  0%, 100% { opacity: .5; transform: scale(.9);
+             filter: drop-shadow(0 0 0 rgba(255,209,0,0)); }
+  50%      { opacity: 1;  transform: scale(1.08);
+             filter: drop-shadow(0 0 9px rgba(255,209,0,.95)); }
+}
+
+/* No border, no label, no chrome. It should read as part of the number until
+   the pointer is on it. */
+.copybit { display: inline-flex; align-items: center; gap: 4px;
+  padding: 0; border: 0; background: none; cursor: pointer;
+  font-family: 'Space Mono', monospace; font-size: 10px;
+  color: rgba(244,228,193,.45); }
+.copybit:hover { color: #ffd100; }
+.copybit-mark { width: 11px; height: 11px; flex: none;
+  opacity: .3; transition: opacity .15s; }
+.copybit:hover .copybit-mark, .copybit:focus-visible .copybit-mark { opacity: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  .bridge-wait { animation: none !important; opacity: .8; }
+}

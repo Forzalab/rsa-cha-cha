@@ -12,6 +12,13 @@
 #include <GraphAdjList.h> 
 using namespace std; // for convieniece
 
+// ---------------------------------------------------------------- BRIDGES
+// FILL THESE IN. Hardcoded on purpose -- no env vars, no config file, no key
+// management (handout section 2). Copy them off the BRIDGES account page.
+inline const std::string BRIDGES_USERNAME = "PUT_BRIDGES_USERNAME_HERE";
+inline const std::string BRIDGES_APIKEY   = "PUT_BRIDGES_APIKEY_HERE";
+inline constexpr unsigned int BRIDGES_ASSIGNMENT = 1;
+
 namespace mp = boost::multiprecision;
 using cpp_int = mp::cpp_int;
 using key = cpp_int;
@@ -123,12 +130,7 @@ inline key Utility::D(const key& e, const cpp_int& n) {
 }    
 
 inline URLString Utility::get_visualization_url(const cpp_int& p, const cpp_int& q, const cpp_int& n, const cpp_int& t, const key& e, const key& d) {
-	// this will need BRIDGES, but just complete the other ones first pls
-	// ill try to setup BRIDGES libs ASAP
-	string apiKey = "YOUR_API_KEY";
-	string userName = "YOUR_USERNAME";
-
-	bridges::Bridges bridges(1, userName, apiKey);
+	bridges::Bridges bridges(BRIDGES_ASSIGNMENT, BRIDGES_USERNAME, BRIDGES_APIKEY);
 
 
 	bridges::datastructure::GraphAdjList<string, string, int> graph;
@@ -149,13 +151,13 @@ inline URLString Utility::get_visualization_url(const cpp_int& p, const cpp_int&
 
 
 	bridges.setDataStructure(&graph);
-	bridges.visualize();
+	bridges.visualize();   // throws on a bad key, a dead server, or a 413
 
-	string url =  "https://assignments.bridgesuncc.org/assignments/" +
-		std::to_string(1) +
-		"/" +
-		userName;
-	return URLString(url);
+	// Ask the library rather than rebuilding the string. Bridges.h builds it
+	// from BASE_URL, which is http:// and not https://, and it uses the
+	// assignment number it actually posted to. A hand-written copy drifts the
+	// first time either of those moves.
+	return URLString(bridges.getVisualizeURL());
 }
 
 #endif
