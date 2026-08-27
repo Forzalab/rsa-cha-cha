@@ -9,15 +9,26 @@
 #include <string> // bcs strings is rad
 #include <Bridges.h> // Bridges libs/include 
 #include <boost/random.hpp> // for random num generator 
-#include <GraphAdjList.h> 
+#include <ColorGrid.h>
+#include <GraphAdjList.h>
+#include <vector>
+#include <algorithm>
+#include <cstddef>
+
 using namespace std; // for convieniece
+
+// ---------------------------------------------------------------- BRIDGES
+// FILL THESE IN. Hardcoded on purpose -- no env vars, no config file, no key
+// management (handout section 2). Copy them off the BRIDGES account page.
+inline const std::string BRIDGES_USERNAME = "Knelt3801";
+inline const std::string BRIDGES_APIKEY   = "1528650419935";
+inline constexpr unsigned int BRIDGES_ASSIGNMENT = 69696969;
 
 namespace mp = boost::multiprecision;
 using cpp_int = mp::cpp_int;
 using key = cpp_int;
 using prime_size = uint32_t;
 using URLString = string;
-using GraphAdjList = bridges::datastructure::GraphAdjList<string, string, string>;
 // interfaces - avoid .h to reduce complexity for newbies
 // To Bruce: only implement in the brackets below the class braxket, dont fill out anything in Utility class scope!!!!! <3
 // its gonna be a rabbit hole, lol
@@ -34,7 +45,19 @@ class Utility {
 		static bool is_small_prime(const cpp_int& x);
 		static key E(const cpp_int& t, const cpp_int& n); /// 65537 unless N is smaller
 		static key D(const key& e, const cpp_int& t);
-		static URLString get_visualization_url(const cpp_int& p, const cpp_int& q, const cpp_int& n, const cpp_int& t, const key& e, const key& d); // MUST return a string - param can be anything u please. if change param, change it both at declaration + definition, or u will get compile err
+		// Two bands of bytes, plaintext over ciphertext, in one grid. Hue is
+		// the byte value. Readable text lives in a narrow slice of the byte
+		// range, so the top band comes out banded and repetitive; ciphertext
+		// is spread flat across all 256 values, so the bottom band is static.
+		// The picture argues for itself. Nothing has to be captioned.
+		// Two slides under one URL. Slide 1 is the keypair: six labelled nodes
+		// wired in the order they are actually derived. Slide 2 is the same
+		// message twice over, plaintext bytes above ciphertext bytes.
+		static URLString get_visualization_url(const cpp_int& p, const cpp_int& q,
+		                                        const cpp_int& n, const cpp_int& t,
+		                                        const key& e, const key& d,
+		                                        const std::vector<int>& plain,
+		                                        const std::vector<int>& cipher);
 		static bridges::Bridges get_bridges();
 };
 
@@ -122,40 +145,135 @@ inline key Utility::D(const key& e, const cpp_int& n) {
 	return d;
 }    
 
-inline URLString Utility::get_visualization_url(const cpp_int& p, const cpp_int& q, const cpp_int& n, const cpp_int& t, const key& e, const key& d) {
-	// this will need BRIDGES, but just complete the other ones first pls
-	// ill try to setup BRIDGES libs ASAP
-	string apiKey = "YOUR_API_KEY";
-	string userName = "YOUR_USERNAME";
+// Verified against Element.h: the node JSON carries color, location, shape,
+// size and `name` -- and `name` is the LABEL. The second argument to
+// addVertex lands in `value`, which is never serialised. That is the whole
+// reason the first attempt rendered six bare names: the numbers were being
+// stored somewhere the browser never reads. setLabel is the only way in.
+inline std::string node_text(const std::string& name, const cpp_int& v) {
+	const std::string digits = v.str();
+	if (digits.size() <= 22) return name + " = " + digits;
+	return name + " = " + digits.substr(0, 10) + "\u2026" +
+	       digits.substr(digits.size() - 6) + "  (" +
+	       std::to_string(digits.size()) + " digits)";
+}
 
-	bridges::Bridges bridges(1, userName, apiKey);
+// Byte value -> colour, straight round the hue circle. A plain ramp would put
+// every printable character into one narrow patch of grey and the two bands
+// would look alike; spreading them over the full circle is what makes the
+// difference visible from across a room.
+inline bridges::Color byte_hue(int byte) {
+	const double h = (byte / 256.0) * 6.0;   // sixths of the circle
+	const int    seg = static_cast<int>(h);
+	const double f = h - seg;
+	const int    hi = 242, lo = 38;
+	const int    up = lo + static_cast<int>((hi - lo) * f);
+	const int    dn = hi - static_cast<int>((hi - lo) * f);
+	switch (seg) {
+		case 0:  return bridges::Color(hi, up, lo);
+		case 1:  return bridges::Color(dn, hi, lo);
+		case 2:  return bridges::Color(lo, hi, up);
+		case 3:  return bridges::Color(lo, dn, hi);
+		case 4:  return bridges::Color(up, lo, hi);
+		default: return bridges::Color(hi, lo, dn);
+	}
+}
 
+inline URLString Utility::get_visualization_url(const cpp_int& p, const cpp_int& q,
+                                                const cpp_int& n, const cpp_int& t,
+                                                const key& e, const key& d,
+                                                const std::vector<int>& plain,
+                                                const std::vector<int>& cipher) {
+	bridges::Bridges bridges(BRIDGES_ASSIGNMENT, BRIDGES_USERNAME, BRIDGES_APIKEY);
 
-	bridges::datastructure::GraphAdjList<string, string, int> graph;
+	// ---- slide 1: the keypair -------------------------------------------
+	{
+		bridges::datastructure::GraphAdjList<string, string, string> keys;
+		for (const char* k : {"p", "q", "N", "T", "e", "d"}) keys.addVertex(k, "");
 
-	graph.addVertex("p", p.str());
-	graph.addVertex("q", q.str());
-	graph.addVertex("N", n.str());
-	graph.addVertex("totient", t.str());
-	graph.addVertex("e", e.str());
-	graph.addVertex("d", d.str());
+		keys.getVertex("p")->setLabel(node_text("p", p));
+		keys.getVertex("q")->setLabel(node_text("q", q));
+		keys.getVertex("N")->setLabel(node_text("N", n));
+		keys.getVertex("T")->setLabel(node_text("T", t));
+		keys.getVertex("e")->setLabel(node_text("e", e));
+		keys.getVertex("d")->setLabel(node_text("d", d));
 
-	graph.addEdge("p", "N", 1);
-	graph.addEdge("q", "N", 1);
-	graph.addEdge("p", "totient", 1);
-	graph.addEdge("q", "totient", 1);
-	graph.addEdge("totient", "e", 1);
-	graph.addEdge("e", "d", 1);
+		// Colour says one thing and one thing only: who is allowed to see it.
+		// Gold travels; red never leaves the machine that made it. Somebody
+		// who knows no RSA still reads two groups off this picture.
+		const bridges::Color PUBLIC(255, 209, 0);
+		const bridges::Color SECRET(226, 42, 74);
+		for (const char* k : {"N", "e"}) {
+			keys.getVertex(k)->setColor(PUBLIC);
+			keys.getVertex(k)->setShape(bridges::STAR);
+			keys.getVertex(k)->setSize(48.0);
+		}
+		for (const char* k : {"p", "q", "d"}) {
+			keys.getVertex(k)->setColor(SECRET);
+			keys.getVertex(k)->setShape(bridges::SQUARE);
+			keys.getVertex(k)->setSize(34.0);
+		}
+		keys.getVertex("T")->setColor(bridges::Color(150, 120, 190));
+		keys.getVertex("T")->setShape(bridges::DIAMOND);
+		keys.getVertex("T")->setSize(30.0);
 
+		// Placed by hand, left to right in derivation order. Without this the
+		// force layout scatters six nodes into a shape that means nothing.
+		keys.getVertex("p")->setLocation(0.0,  1.0);
+		keys.getVertex("q")->setLocation(0.0, -1.0);
+		keys.getVertex("N")->setLocation(1.6,  1.2);
+		keys.getVertex("T")->setLocation(1.6, -1.2);
+		keys.getVertex("e")->setLocation(3.2, -0.2);
+		keys.getVertex("d")->setLocation(4.6, -1.2);
 
-	bridges.setDataStructure(&graph);
-	bridges.visualize();
+		keys.addEdge("p", "N"); keys.addEdge("q", "N");
+		keys.addEdge("p", "T"); keys.addEdge("q", "T");
+		keys.addEdge("T", "e"); keys.addEdge("T", "d");
+		keys.addEdge("e", "d");
+		// Edges carry structure, not arithmetic. No formulas on them on
+		// purpose -- how T and d are computed is exam material, and a
+		// visualisation is a poor place to put an answer key.
+		for (auto pair : {std::pair<const char*, const char*>{"p", "N"}, {"q", "N"},
+		                  {"p", "T"}, {"q", "T"}, {"T", "e"}, {"T", "d"}, {"e", "d"}}) {
+			auto* link = keys.getLinkVisualizer(pair.first, pair.second);
+			link->setThickness(2.5);
+			link->setColor(bridges::Color(150, 150, 160));
+		}
 
-	string url =  "https://assignments.bridgesuncc.org/assignments/" +
-		std::to_string(1) +
-		"/" +
-		userName;
-	return URLString(url);
+		bridges.setDataStructure(&keys);
+		bridges.visualize();
+	}
+
+	// ---- slide 2: the same message, before and after ---------------------
+	const int COLS = 48;
+	const int GAP  = 2;                       // dark rule between the bands
+	const auto rows_for = [&](std::size_t n) {
+		return static_cast<int>((n + COLS - 1) / COLS);
+	};
+	const int top    = std::max(1, rows_for(plain.size()));
+	const int bottom = std::max(1, rows_for(cipher.size()));
+
+	bridges::datastructure::ColorGrid grid(top + GAP + bottom, COLS,
+	                                       bridges::Color(14, 14, 18));
+
+	for (std::size_t i = 0; i < plain.size(); ++i)
+		grid.set(static_cast<int>(i / COLS), static_cast<int>(i % COLS),
+		         byte_hue(plain[i] & 0xff));
+
+	for (std::size_t i = 0; i < cipher.size(); ++i)
+		grid.set(top + GAP + static_cast<int>(i / COLS), static_cast<int>(i % COLS),
+		         byte_hue(cipher[i] & 0xff));
+
+	if (!plain.empty() || !cipher.empty()) {
+		bridges.setDataStructure(&grid);
+		bridges.visualize();   // throws on a bad key, a dead server, or a 413
+	}
+
+	// Ask the library rather than rebuilding the string. Bridges.h builds it
+	// from BASE_URL, which is http:// and not https://, and it uses the
+	// assignment number it actually posted to. A hand-written copy drifts the
+	// first time either of those moves.
+	return URLString(bridges.getVisualizeURL());
 }
 
 #endif

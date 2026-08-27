@@ -176,6 +176,20 @@ function JoinSlug({ notice }) {
   )
 }
 
+function BridgeIcon({ size = 19 }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor"
+      strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M6 4v16M18 4v16" />
+      <path d="M2.5 7.6C4.6 6.7 6 5.5 6 4M21.5 7.6C19.4 6.7 18 5.5 18 4" />
+      <path d="M6 4c0 4.1 2.7 6.6 6 6.6s6-2.5 6-6.6" />
+      <path d="M2.5 14h19" />
+      <path d="M9.2 9.7V14M12 10.8V14M14.8 9.7V14" />
+      <path d="M3.5 20h5M15.5 20h5" />
+    </svg>
+  )
+}
+
 export default function App() {
   const chat = useChatSocket()
   const joined = chat.status === 'joined'
@@ -184,6 +198,13 @@ export default function App() {
   const [openReactions, setOpenReactions] = useState(null)
   const [stickerPickerOpen, setStickerPickerOpen] = useState(false)
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false)
+  const [bridgeWait, setBridgeWait] = useState(false)
+  const [bridgeError, setBridgeError] = useState('')
+  useEffect(() => {
+    if (!bridgeError) return
+    const clear = setTimeout(() => setBridgeError(''), 6000)
+    return () => clearTimeout(clear)
+  }, [bridgeError])
   const [entryComplete, setEntryComplete] = useState(false)
   const [sendCoolingDown, setSendCoolingDown] = useState(false)
   const completeEntry = useCallback(() => setEntryComplete(true), [])
@@ -394,6 +415,30 @@ export default function App() {
     window.setTimeout(() => setSendCoolingDown(false), SEND_COOLDOWN_MS)
   }
 
+  const openBridges = (event) => {
+    event.stopPropagation()
+    if (bridgeWait) return
+    // Popup blockers only allow window.open inside a real gesture. Claim the
+    // tab on the click, park a holding page in it, redirect it on the reply.
+    const tab = window.open('', '_blank')
+    if (tab) {
+      tab.document.write('<title>BRIDGES</title><body style="margin:0;height:100vh;display:grid;place-items:center;background:#12010a;color:#ffd100;font:13px ui-monospace,monospace">posting the structure to BRIDGES\u2026</body>')
+      tab.document.close()
+    }
+    setBridgeWait(true)
+    setBridgeError('')
+    chat.requestBridges((result) => {
+      setBridgeWait(false)
+      if (result.ok && result.url) {
+        if (tab && !tab.closed) tab.location.href = result.url
+        else window.open(result.url, '_blank', 'noopener')
+        return
+      }
+      if (tab && !tab.closed) tab.close()
+      setBridgeError(result.detail || 'BRIDGES failed.')
+    })
+  }
+
   return (
     <main onPointerDown={unlockPing} onKeyDown={unlockPing} onClick={() => { setOpenReactions(null); setStickerPickerOpen(false); setEmojiPickerOpen(false) }} className="aurora grid-glow relative min-h-screen overflow-hidden app-main">
       <RsaMatrixBackground />
@@ -569,16 +614,17 @@ export default function App() {
               </div>
             )}
             <div className="flex items-center gap-2 rounded-[2px] border border-[#ffd100]/70 bg-[#12010a] px-2 py-1.5 shadow-[6px_6px_0_rgba(0,0,0,.45)] transition-colors duration-200 focus-within:border-[#ffd100] focus-within:bg-[#0c0107]">
-              <button type="button" onClick={(event) => { event.stopPropagation(); setStickerPickerOpen((open) => !open); setEmojiPickerOpen(false); setOpenReactions(null) }} disabled={!joined} aria-label="Open image picker" className={`react-idle react-idle--offset grid h-9 w-9 shrink-0 place-items-center rounded-[2px] transition-colors duration-150 disabled:opacity-30 ${stickerPickerOpen ? 'bg-[#ffd100] text-[#4a0410]' : 'text-[#ffd100] hover:bg-[#ffd100] hover:text-[#4a0410]'}`}><ImagePlus size={19} /></button>
-              <button type="button" onClick={(event) => { event.stopPropagation(); setEmojiPickerOpen((open) => !open); setStickerPickerOpen(false); setOpenReactions(null) }} disabled={!joined} aria-label="Open emoji picker" className={`react-idle grid h-9 w-9 shrink-0 place-items-center rounded-[2px] transition-colors duration-150 disabled:opacity-30 ${emojiPickerOpen ? 'bg-[#ffd100] text-[#4a0410]' : 'text-[#ffd100] hover:bg-[#ffd100] hover:text-[#4a0410]'}`}><Smile size={19} /></button>
+              <button type="button" onClick={(event) => { event.stopPropagation(); setStickerPickerOpen((open) => !open); setEmojiPickerOpen(false); setOpenReactions(null) }} disabled={!joined} aria-label="Open image picker" className={`react-idle react-idle--b grid h-9 w-9 shrink-0 place-items-center rounded-[2px] transition-colors duration-150 disabled:opacity-30 ${stickerPickerOpen ? 'bg-[#ffd100] text-[#4a0410]' : 'text-[#ffd100] hover:bg-[#ffd100] hover:text-[#4a0410]'}`}><ImagePlus size={19} /></button>
+              <button type="button" onClick={(event) => { event.stopPropagation(); setEmojiPickerOpen((open) => !open); setStickerPickerOpen(false); setOpenReactions(null) }} disabled={!joined} aria-label="Open emoji picker" className={`react-idle react-idle--c grid h-9 w-9 shrink-0 place-items-center rounded-[2px] transition-colors duration-150 disabled:opacity-30 ${emojiPickerOpen ? 'bg-[#ffd100] text-[#4a0410]' : 'text-[#ffd100] hover:bg-[#ffd100] hover:text-[#4a0410]'}`}><Smile size={19} /></button>
+              <button type="button" onClick={openBridges} disabled={!joined || bridgeWait} aria-label="Open the BRIDGES visualization" title="Visualize using BRIDGES" className={`react-idle react-idle--d grid h-9 w-9 shrink-0 place-items-center rounded-[2px] transition-colors duration-150 disabled:opacity-30 ${bridgeWait ? 'text-[#ffd100]' : 'text-[#ffd100] hover:bg-[#ffd100] hover:text-[#4a0410]'}`}><span className={bridgeWait ? 'bridge-wait' : undefined}><BridgeIcon /></span></button>
               <div className="relative min-w-0 flex-1">
               {!draft && joined && <RollingPlaceholder />}
               <textarea value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) send(event) }} disabled={!joined} rows="1" wrap="soft" placeholder="" aria-invalid={charactersOver > 0} className={`relative z-10 block max-h-32 min-h-9 w-full resize-none overflow-y-auto whitespace-pre-wrap break-words [overflow-wrap:anywhere] bg-transparent px-2 py-2 text-sm leading-5 outline-none placeholder:text-[#ffd100]/50 ${charactersOver ? 'text-rose-300' : 'text-white'}`} />
               </div>
               <button disabled={!joined || !draft.trim() || charactersOver > 0 || sendCoolingDown} aria-label="Send message" className={`group grid h-9 w-9 shrink-0 place-items-center rounded-[2px] bg-[#ffd100] text-[#4a0410] transition duration-150 hover:-translate-y-0.5 hover:brightness-110 active:translate-y-px disabled:bg-[#5c3a06] disabled:text-[#ffd100]/55 disabled:hover:translate-y-0 ${sendPulse ? 'send-burst' : sendNudge ? 'send-nudge' : ''}`}><Send className="transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" size={18} /></button>
             </div>
-            <div className={`flex justify-end px-3 text-[10px] ${charactersOver > 0 || draftLength >= 450 || /\bkerney\b/i.test(draft) ? 'mt-1.5 h-4' : 'h-0'}`}>
-              {charactersOver > 0 ? <span className="font-medium text-rose-400">Remove {charactersOver} character{charactersOver === 1 ? '' : 's'} to send</span> : /\bkerney\b/i.test(draft) ? <span className="text-yellow-400/60">Careful what you wish for.</span> : draftLength >= 450 ? <span className={draftLength >= 490 ? 'text-[#ffe873]' : 'text-[#f4e4c1]/45'}>{draftLength}/{MAX_MESSAGE_LENGTH}</span> : null}
+            <div className={`flex justify-end px-3 text-[10px] ${bridgeError || charactersOver > 0 || draftLength >= 450 || /\bkerney\b/i.test(draft) ? 'mt-1.5 h-4' : 'h-0'}`}>
+              {bridgeError ? <span className="truncate font-medium text-rose-400">{bridgeError}</span> : charactersOver > 0 ? <span className="font-medium text-rose-400">Remove {charactersOver} character{charactersOver === 1 ? '' : 's'} to send</span> : /\bkerney\b/i.test(draft) ? <span className="text-yellow-400/60">Careful what you wish for.</span> : draftLength >= 450 ? <span className={draftLength >= 490 ? 'text-[#ffe873]' : 'text-[#f4e4c1]/45'}>{draftLength}/{MAX_MESSAGE_LENGTH}</span> : null}
             </div>
           </form>
         </div>

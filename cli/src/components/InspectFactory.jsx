@@ -6,7 +6,7 @@
 // warm flare when its digits move, red strobe when it takes a hit.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { decimalFromText, textFromDecimal, modPow, maxBytesFor } from '../lib/rsa.js'
+import { BLOCK_SEP, decimalFromText, textFromDecimal, modPow, maxBytesFor } from '../lib/rsa.js'
 import { markTakeover, markTier, tooltipLine } from '../lib/ritualState.js'
 
 // An empty box gets the plain invitation, always. "faster, comrade" means
@@ -112,18 +112,49 @@ function Digits({ value, rogueAt }) {
 
 // One lamp only, and it hangs off the bottom of the WRITE box. Swings and
 // runs hot while the operator types.
-function DeskLamp({ lit }) {
+// E and N are what somebody needs to encrypt to you, so they have to leave
+// this panel. navigator.clipboard is gated on a secure context and the site
+// is served over plain http -- the same trap that killed crypto.randomUUID on
+// the first deploy. execCommand is the fallback that still works there.
+function CopyBit({ label, value, beg = false }) {
+  const [done, setDone] = useState(false)
+  // Once somebody has copied it, the hint has done its job. An affordance
+  // that keeps waving after you obeyed it is just nagging.
+  const [seen, setSeen] = useState(false)
+  const copy = (event) => {
+    event.stopPropagation()
+    try {
+      if (navigator.clipboard?.writeText) navigator.clipboard.writeText(value)
+      else throw new Error('no clipboard api')
+    } catch {
+      const pad = document.createElement('textarea')
+      pad.value = value
+      pad.setAttribute('readonly', '')
+      pad.style.cssText = 'position:fixed;top:0;left:0;opacity:0'
+      document.body.appendChild(pad)
+      pad.select()
+      try { document.execCommand('copy') } catch { /* nothing left to try */ }
+      pad.remove()
+    }
+    setDone(true)
+    setSeen(true)
+    setTimeout(() => setDone(false), 900)
+  }
+  const begging = beg && !seen
   return (
-    <div className={`desklamp ${lit ? 'desklamp-flare' : ''}`}>
-      <span className="desklamp-cord" />
-      <svg viewBox="0 0 24 30" className="desklamp-body">
-        <path d="M8 25h8l2-3H6z" fill="#5a4a2e" />
-        <ellipse className="desklamp-bulb" cx="12" cy="14" rx="6" ry="7" />
-        <path d="M6 8h12v13a6 6 0 0 1-12 0z" fill="none" stroke="#6b5836" strokeWidth="1.2" />
-        <path d="M12 8v13M7 12h10M7 17h10" stroke="#6b5836" strokeWidth=".8" />
+    <button type="button" onClick={copy} title={`Copy ${value}`} aria-label={`Copy ${value}`}
+      className={`copybit ${begging ? 'copybit-beg' : ''}`}>
+      {begging && <span className="copybit-ghost" aria-hidden="true">copy</span>}
+      <span>{label}</span>
+      <svg viewBox="0 0 14 14" className="copybit-mark" aria-hidden="true">
+        {done
+          ? <path d="M2.6 7.4l3 3 5.8-6.4" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+          : <>
+              <rect x="4.9" y="4.9" width="6.6" height="6.6" fill="none" stroke="currentColor" strokeWidth="1.2" />
+              <path d="M9.1 2.6H2.5v6.6" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+            </>}
       </svg>
-      <span className="desklamp-cone" />
-    </div>
+    </button>
   )
 }
 
@@ -134,12 +165,14 @@ const MarkBad = () => (
   <svg viewBox="0 0 12 12" className="h-2.5 w-2.5"><path d="M6 2v5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" /><circle cx="6" cy="10" r="1.2" fill="currentColor" /></svg>
 )
 
-function Pipe({ digits, reversed = false, dead = false, heat = 0, flowKey = 0, className = '' }) {
+// `dead` is damage -- red, burning. `off` is a line nobody is feeding: grey,
+// still, and carrying nothing. Two different facts, two different looks.
+function Pipe({ digits, reversed = false, dead = false, off = false, heat = 0, flowKey = 0, className = '' }) {
   return (
-    <div className={`pipe ${dead ? 'pipe-dead' : ''} ${reversed ? 'pipe-rev' : ''} ${className}`}>
+    <div className={`pipe ${off ? 'pipe-off' : dead ? 'pipe-dead' : ''} ${reversed ? 'pipe-rev' : ''} ${className}`}>
       <span className="pipe-fluid" />
-      {!dead && flowKey > 0 && <span key={flowKey} className="pipe-chevrons" aria-hidden="true">❯❯❯❯❯❯❯❯</span>}
-      {digits.map((d, i) => (
+      {!dead && !off && flowKey > 0 && <span key={flowKey} className="pipe-chevrons" aria-hidden="true">❯❯❯❯❯❯❯❯</span>}
+      {(off ? [] : digits).map((d, i) => (
         <span key={i} className="pipe-bit" style={{
           animationDelay: `${i * 0.42}s`, top: `${18 + (i % 3) * 26}%`,
           animationDuration: `${2.5 / (1 + heat * 2.5)}s`,
@@ -150,21 +183,27 @@ function Pipe({ digits, reversed = false, dead = false, heat = 0, flowKey = 0, c
   )
 }
 
-function Station({ n, tone, seal, onSeal, innerRef, footer, rail, editable = false, sealed = false, children }) {
+function Station({ n, tone, seal, onSeal, innerRef, footer, rail, head, editable = false, sealed = false, reject = 0, children }) {
+  // Two class names, one animation each. Re-adding a class React never removed
+  // does not restart a CSS animation, so consecutive rejections alternate.
+  const shake = reject === 1 ? 'station-reject-a' : reject === 2 ? 'station-reject-b' : ''
   return (
-    <div ref={innerRef} className={`station relative z-10 w-44 shrink-0 ${tone === 'danger' ? 'station-hit' : tone === 'hot' ? 'station-live' : ''} ${editable ? 'station-console' : ''} ${sealed ? 'station-glass' : ''}`}>
+    <div ref={innerRef} className={`station relative z-10 w-44 shrink-0 ${tone === 'danger' ? 'station-hit' : tone === 'hot' ? 'station-live' : tone === 'off' ? 'station-off' : ''} ${editable ? 'station-console' : ''} ${sealed ? 'station-glass' : ''} ${shake}`}>
       <div className="station-plate">
         <span className="rivet" style={{ left: 4, top: 4 }} /><span className="rivet" style={{ right: 4, top: 4 }} />
         <span className="rivet" style={{ left: 4, bottom: 4 }} /><span className="rivet" style={{ right: 4, bottom: 4 }} />
         <div className="flex items-center gap-1.5 border-b border-[#ffd100]/25 px-2 py-1">
           <span className="grid min-h-5 min-w-5 place-items-center border border-[#ffd100]/60 bg-[#ffd100]/10 px-1 font-mono text-[11px] font-black text-[#ffd100]">{n}</span>
-          {editable && <span className="ml-auto text-[11px]">✏️</span>}
-          {seal != null && (
-            <button type="button" onClick={onSeal} aria-label="signature"
-              className={`ml-auto grid h-5 w-5 place-items-center rounded-full border font-mono text-[9px] font-black ${seal ? 'border-[#2dd4bf] bg-[#2dd4bf]/15 text-[#2dd4bf]' : 'seal-panic border-[#ff2d78] bg-[#ff2d78]/20 text-[#ff2d78]'}`}>
-              {seal ? <MarkOk /> : <MarkBad />}
-            </button>
-          )}
+          <span className="ml-auto flex items-center gap-1.5">
+            {editable && <span className="station-edit-tag">edit</span>}
+            {head}
+            {seal != null && (
+              <button type="button" onClick={onSeal} aria-label="signature"
+                className={`grid h-5 w-5 place-items-center rounded-full border font-mono text-[9px] font-black ${seal ? 'border-[#2dd4bf] bg-[#2dd4bf]/15 text-[#2dd4bf]' : 'seal-panic border-[#ff2d78] bg-[#ff2d78]/20 text-[#ff2d78]'}`}>
+                {seal ? <MarkOk /> : <MarkBad />}
+              </button>
+            )}
+          </span>
         </div>
         <div className="h-20 overflow-y-auto break-all p-2 font-mono text-[10px] leading-4 text-[#fff6dc]/85">
           {sealed && <span className="glass-cover" aria-hidden="true" />}
@@ -174,21 +213,19 @@ function Station({ n, tone, seal, onSeal, innerRef, footer, rail, editable = fal
       {rail}
       {footer}
       {tone === 'danger' && <>
-        <span className="smoke" style={{ left: '20%' }} />
-        <span className="smoke" style={{ left: '48%', animationDelay: '.55s' }} />
-        <span className="smoke" style={{ left: '74%', animationDelay: '1.15s' }} />
+        <span className="smoke" style={{ left: '14%', animationDelay: '0s',    '--puff': 1.25 }} />
+        <span className="smoke" style={{ left: '33%', animationDelay: '.42s',  '--puff': .85 }} />
+        <span className="smoke" style={{ left: '50%', animationDelay: '.86s',  '--puff': 1.45 }} />
+        <span className="smoke" style={{ left: '68%', animationDelay: '1.28s', '--puff': .95 }} />
+        <span className="smoke" style={{ left: '85%', animationDelay: '1.7s',  '--puff': 1.15 }} />
       </>}
     </div>
   )
 }
 
 function RayStar({ armed, onFire, eye = 0, gaze = { x: 0, y: 0 } }) {
-  const [tip, setTip] = useState(false)
-  // A keystroke sends one chevron train down every pipe in the direction the
-  // line is running. The key restarts the animation; it dies on its own.
-  const [flowKey, setFlowKey] = useState(0)
   return (
-    <button type="button" onClick={onFire} onMouseEnter={() => setTip(true)} onMouseLeave={() => setTip(false)}
+    <button type="button" onClick={onFire}
       aria-label="cosmic ray" className="ray-star relative z-20 grid h-16 w-16 place-items-center bg-transparent">
       <svg viewBox="0 0 64 64" className={`absolute inset-0 star-outer ${armed ? 'star-armed' : ''}`}>
         <polygon points="32,3 39,22 60,22 43,35 49,56 32,44 15,56 21,35 4,22 25,22" fill="none" stroke="#ffd100" strokeWidth="2.5" />
@@ -204,7 +241,6 @@ function RayStar({ armed, onFire, eye = 0, gaze = { x: 0, y: 0 } }) {
           <path d="M19 32a13 8 0 0 0 26 0" fill="none" stroke="#7a5f24" strokeWidth="1.4" />
         </svg>
       )}
-      {tip && <span className="pointer-events-none absolute -top-6 left-1/2 -translate-x-1/2 border border-[#ffd100]/60 bg-[#12010a] px-1.5 font-mono text-[9px] text-[#ffd100]">zap</span>}
     </button>
   )
 }
@@ -232,6 +268,13 @@ function useWpm() {
     recompute()
   }, [recompute])
 
+  // A paste moves the text length without being typing. Resync slides the
+  // cursor past it silently; skipping it would make the next real keystroke
+  // compute a negative delta and go uncounted.
+  const resync = useCallback((len) => {
+    lastLen.current = len
+  }, [])
+
   const reset = useCallback(() => {
     events.current = []
     setWpm(0)
@@ -242,7 +285,7 @@ function useWpm() {
     return () => clearInterval(id)
   }, [recompute])
 
-  return { wpm, feed, reset }
+  return { wpm, feed, resync, reset }
 }
 
 // Fixed three reels. Leading zeros stay in the layout but go invisible, so
@@ -251,12 +294,15 @@ function useWpm() {
 // Past 20 the tag widens and the reels start turning. Nobody is told.
 const COUNTER_WAKE = 20
 
-function Counter({ value, hot, rage }) {
+function Counter({ value, idle, hot, rage }) {
   const woken = value >= COUNTER_WAKE
   const shown = String(Math.min(999, value))
   const digits = shown.padStart(3, '0').split('')
   const lead = shown.padStart(3, '0').search(/[1-9]/)
-  if (!woken) return <span className="counter counter-idle">1</span>
+  // The sleeping face is the station number. It was literal '1' back when the
+  // counter could only ever live on station 1; the moment it started moving
+  // between the two consoles, station 5 started calling itself 1.
+  if (!woken) return <span className="counter counter-idle">{idle}</span>
   return (
     <span className={`counter counter-woke ${hot ? 'counter-hot' : ''} ${rage ? 'counter-rage' : ''}`}>
       {digits.map((d, i) => (
@@ -271,19 +317,50 @@ function Counter({ value, hot, rage }) {
 }
 
 // Fills as you type, drains the moment you slow. The drain is the point.
-function GloryGauge({ wpm, ratchet }) {
-  const fill = Math.min(1, wpm / 130)
+//
+// It used to be an 8px rail bolted to station 1, which tied the whole glory
+// system to one box and made typing into station 5 look unscored. A bar
+// across the top belongs to the floor, not to a station -- so both consoles
+// feed the same one and nothing has to move when the direction flips.
+// No number on it. A gauge you cannot read is a gauge you keep watching, and
+// the only quantity that matters is whether it is still climbing.
+//
+// The track measures 0..100, so the second tick is the lip of the vessel
+// rather than a mark two thirds along. Past it the fill has nowhere to go and
+// stops obeying the housing -- it crawls out the right side, green, fuming.
+function GloryBar({ wpm, tier, ratchet }) {
+  const fill = Math.min(1, wpm / TIERS[1])
+  const spill = Math.max(0, Math.min(1, (wpm - TIERS[1]) / (TIERS[2] - TIERS[1])))
   return (
-    <div className={`gauge ${ratchet ? 'gauge-ratchet' : ''}`}>
-      <div className="gauge-fill" style={{ height: `${fill * 100}%` }} />
-      {TIERS.map((t) => (
-        <span key={t} className={`gauge-tick ${wpm >= t ? 'gauge-tick-lit' : ''}`} style={{ bottom: `${(t / 130) * 100}%` }} />
-      ))}
+    <div className={`glorybar glorybar-t${tier} ${ratchet ? 'glorybar-ratchet' : ''}`}>
+      <div className="glorybar-rig">
+        <div className="glorybar-track">
+          <div className="glorybar-fill" style={{ width: `${fill * 100}%` }} />
+          <span className="glorybar-notches" aria-hidden="true" />
+          <span className={`glorybar-tick ${wpm >= TIERS[0] ? 'glorybar-tick-lit' : ''}`}
+            style={{ left: `${(TIERS[0] / TIERS[1]) * 100}%` }} />
+        </div>
+        {spill > 0 && (
+          <span className="glorybar-spill" aria-hidden="true"
+            style={{ width: `${16 + spill * 104}px`, '--spill': spill }}>
+            <span className="glorybar-ooze" />
+            <span className="glorybar-fume" />
+            <span className="glorybar-fume" style={{ animationDelay: '.6s' }} />
+            <span className="glorybar-fume" style={{ animationDelay: '1.2s' }} />
+          </span>
+        )}
+      </div>
     </div>
   )
 }
 
+// Below 100 wpm the field is a texture you are not meant to read. The veil
+// only opens across the last tick, so the boxes stay the loudest thing on
+// screen until the room has already been earned.
+const VEIL_FLOOR = 100 / 130
+
 function MatrixField({ seed, heat = 0 }) {
+  const veil = Math.max(0, (heat - VEIL_FLOOR) / (1 - VEIL_FLOOR))
   // A cipher of "0" is six characters after repeat, so every column past the
   // first came back empty. Pad the seed before slicing.
   const base = String(seed || '0') + '0173925486'
@@ -297,7 +374,7 @@ function MatrixField({ seed, heat = 0 }) {
   return (
     <div className="matrix-field pointer-events-none absolute inset-0 z-0 overflow-hidden">
       {cols.map((c, i) => (
-        <span key={i} className="matrix-col" style={{ left: c.left, animationDelay: c.delay, animationDuration: c.dur, opacity: 0.055 + heat * 0.17, color: `rgb(${Math.round(150 + heat * 105)},${Math.round(118 + heat * 114)},${Math.round(40 + heat * 75)})` }}>{c.text}</span>
+        <span key={i} className="matrix-col" style={{ left: c.left, animationDelay: c.delay, animationDuration: c.dur, opacity: 0.018 + veil * 0.2, color: `rgb(${Math.round(96 + veil * 159)},${Math.round(76 + veil * 156)},${Math.round(26 + veil * 89)})` }}>{c.text}</span>
       ))}
     </div>
   )
@@ -313,8 +390,13 @@ export function InspectFactory({ message, keypair, onClose, onRitual }) {
   // Which end of the line is the source. 'back' makes station 5 drive and
   // station 1 mirror, which is the shape of decrypting a message you were
   // handed rather than composing one.
+  // 'cipher' is the third source: station 3 holds a pasted ciphertext and the
+  // plaintext ends become read-outs. It is a number, so none of the text
+  // machinery (byte cap, packing) applies to it.
+  // Two directions only. Station 5 holds recovered plaintext, so composing
+  // from it was never sound -- there is nothing upstream of a result.
   const [dir, setDir] = useState('fwd')
-  const [out, setOut] = useState(message?.plaintext || 'HELLO')
+  const [cipherDraft, setCipherDraft] = useState('')
   const [ray, setRay] = useState(null)
   const [beam, setBeam] = useState(null)
   const [sealAt, setSealAt] = useState(null)
@@ -325,8 +407,15 @@ export function InspectFactory({ message, keypair, onClose, onRitual }) {
   // line is running. The key restarts the animation; it dies on its own.
   const [flowKey, setFlowKey] = useState(0)
   const [ratchet, setRatchet] = useState(false)
+  // { which, n } -- n alternates 1/2 so a held key keeps re-firing the shake.
+  const [reject, setReject] = useState(null)
 
-  const { wpm, feed, reset: resetWpm } = useWpm()
+  const { wpm, feed, resync, reset: resetWpm } = useWpm()
+  // Set by onPaste, consumed by the next onChange. Pastes update text but are
+  // exempt from the wpm counter, the lamp, the coins, and the ritual chain.
+  const pasteRef = useRef(false)
+  // And the idle "faster, comrade" nag stays quiet until real typing resumes.
+  const pastedSinceKeyRef = useRef(false)
   const coinsRef = useRef(null)
   const lastTierRef = useRef(0)
 
@@ -340,9 +429,31 @@ export function InspectFactory({ message, keypair, onClose, onRitual }) {
   const limit = maxBytesFor(keypair.publicKey.modulus)
 
   // The math never changes with direction. Only the string feeding it does.
-  const source = dir === 'back' ? out : draft
+  const source = draft
+  const locked = dir === 'cipher'   // stations 4 and 5 are downstream of nothing
 
   const line = useMemo(() => {
+    if (dir === 'cipher') {
+      const digits = cipherDraft
+      let m = 0n
+      let recovered = ''
+      if (digits) {
+        try {
+          // A pasted ciphertext may be several blocks. Every block is one
+          // operation; the plaintext is the pieces put back in order.
+          const blocks = digits.split(BLOCK_SEP).filter((part) => part.length)
+          m = modPow(BigInt(blocks[0]), D, N)
+          recovered = blocks
+            .map((part) => textFromDecimal(modPow(BigInt(part), D, N)))
+            .join('')
+        } catch { recovered = '' }
+      }
+      // No signature lane: a pasted cipher carries no signature to verify,
+      // and pretending otherwise would put a red (!) on an honest decrypt.
+      return { text: recovered, m: m.toString(), cipher: digits || '0',
+               wire: digits || '0', recovered, sig: '', attested: '',
+               ok: !!digits && recovered !== '', sigOk: null }
+    }
     const text = clipBytes(source, limit)
     const m = decimalFromText(text).toString()
     const mWire = ray?.target === 'pack' ? flipAt(m, Math.min(ray.at, m.length - 1), ray.digit) : m
@@ -356,15 +467,19 @@ export function InspectFactory({ message, keypair, onClose, onRitual }) {
     let attested
     try { attested = textFromDecimal(modPow(BigInt(sigShown), E, N)) } catch { attested = '' }
     return { text, m: mWire, cipher: cipherShown, wire, recovered, sig: sigShown, attested, ok: recovered === text, sigOk: attested === text }
-  }, [source, ray, E, N, D, limit])
+  }, [source, cipherDraft, dir, ray, E, N, D, limit])
 
   // Damage cascades: a hit at stage i breaks every stage from i onward.
   const hitStage = ray ? STAGE_OF[ray.target] : Infinity
   // Damage always travels downstream. Downstream flips with the direction.
-  const broken = (stage) => (dir === 'back'
+  const broken = (stage) => (dir === 'cipher'
     ? ray != null && stage <= hitStage
     : stage >= hitStage)
   const toneOf = (stage) => (broken(stage) ? 'danger' : 'idle')
+  // A pipe carries whatever the station behind it produced. Kill it only when
+  // that feeder is broken -- a hit on station 3 does not poison 2 -> 3, which
+  // is still delivering clean digits into the wreck. Upstream flips with dir.
+  const pipeDead = (lo, hi) => broken(dir === 'cipher' ? hi : lo)
   const rogueOf = (t, v) => (ray?.target === t ? Math.min(ray.at, String(v).length - 1) : null)
 
   useEffect(() => {
@@ -372,6 +487,12 @@ export function InspectFactory({ message, keypair, onClose, onRitual }) {
     const t = setTimeout(() => setPulse(0), 700)
     return () => clearTimeout(t)
   }, [pulse])
+
+  useEffect(() => {
+    if (!reject) return
+    const t = setTimeout(() => setReject(null), 380)
+    return () => clearTimeout(t)
+  }, [reject])
 
   const heat = Math.min(1, wpm / 130)
   const tier = wpm >= 130 ? 3 : wpm >= 100 ? 2 : wpm >= 60 ? 1 : 0
@@ -398,6 +519,9 @@ export function InspectFactory({ message, keypair, onClose, onRitual }) {
     if (wpm > 0) { setTip(false); return }
     let visible = false
     const id = setInterval(() => {
+      // Somebody who just pasted is not idling; taunting them for zero wpm
+      // over a full box reads as broken. Quiet until keys are struck again.
+      if (pastedSinceKeyRef.current) return
       visible = !visible
       setTip(visible)
       if (visible) setTimeout(() => setTip(false), 1500)
@@ -448,22 +572,84 @@ export function InspectFactory({ message, keypair, onClose, onRitual }) {
 
   // Both boxes feed the same counter, so the gauge, the coins, the eye and the
   // quake behave identically whichever end you are typing into.
+  // A soft keyboard's clipboard menu does not always fire `paste`. Length is
+  // the tell that always works: nobody types five characters in one event.
+  const KEYSTROKE_MAX = 4
   const typeInto = (which) => (event) => {
-    const value = event.target.value
-    if (which === 'back') { setDir('back'); setOut(value); setDraft(value) }
-    else { setDir('fwd'); setDraft(value); setOut(value) }
+    const raw = event.target.value
+    const prev = source.length
+    const pasted = pasteRef.current || Math.abs(event.target.value.length - prev) > KEYSTROKE_MAX
+    pasteRef.current = false
+    // The modulus is the wall. Refuse the character and shake the plate --
+    // that lands harder than a meter creeping toward a number nobody reads.
+    const value = clipBytes(raw, limit)
+    if (value !== raw) setReject((r) => ({ which, n: r && r.n === 1 ? 2 : 1 }))
+    // Touching station 1 re-opens the whole line: 4 and 5 come back on.
+    setDir('fwd')
+    setDraft(value)
     setFlowKey(Date.now())
-    setRay(null); setSealAt(null); setPulse(Date.now())
+    setRay(null); setSealAt(null)
+    if (pasted) {
+      // Text lands, glory does not. The counter's length cursor still has to
+      // move or the next keystroke registers as a negative delta.
+      pastedSinceKeyRef.current = true
+      resync(value.length)
+      return
+    }
+    pastedSinceKeyRef.current = false
+    setPulse(Date.now())
     feed(value.length)
     if (heat > 0.4 && Math.random() < 0.15) burstCoin()
   }
 
-  const bytes = new TextEncoder().encode(source).length
-  const fuel = Math.min(1, bytes / limit)
-  const over = bytes > limit
+  // Station 3. Digits only, and the number stays under N -- anything else is
+  // refused outright with the same shake as the byte wall. A real ciphertext
+  // is already reduced mod N, so it always passes.
+  const typeCipher = (event) => {
+    const raw = event.target.value
+    const pasted = pasteRef.current || Math.abs(raw.length - cipherDraft.length) > KEYSTROKE_MAX
+    pasteRef.current = false
+    // Whitespace is noise from copy-paste. Commas are block separators and
+    // survive; everything between them still has to be a number under N.
+    const digits = raw.replace(/\s/g, '')
+    const blocks = digits.split(BLOCK_SEP).filter((part) => part.length)
+    const bad = /[^\d,]/.test(digits) || blocks.some((part) => BigInt(part) >= N)
+    if (bad) {
+      setReject((r) => ({ which: 'cipher', n: r && r.n === 1 ? 2 : 1 }))
+      return
+    }
+    setDir('cipher')
+    setCipherDraft(digits)
+    setFlowKey(Date.now())
+    setRay(null); setSealAt(null)
+    if (pasted) { pastedSinceKeyRef.current = true; resync(digits.length); return }
+    pastedSinceKeyRef.current = false
+    setPulse(Date.now())
+    feed(digits.length)
+  }
+  const markPaste = () => { pasteRef.current = true }
+
+  // A ciphertext is not something anybody composes by hand, so station 3 does
+  // not accept authored characters at all. `insertFromPaste` and the delete
+  // types still come through -- clipboard in, clipboard out, nothing typed.
+  //
+  // A PASTE button that reads the clipboard for you is not possible here:
+  // navigator.clipboard.readText needs a secure context and this is served
+  // over plain http. So the button only puts the caret where it belongs.
+  const cipherRef = useRef(null)
+  const refuseTyping = (event) => {
+    if (String(event.nativeEvent?.inputType || '').startsWith('insertFromPaste')) return
+    if (String(event.nativeEvent?.inputType || '').startsWith('delete')) return
+    event.preventDefault()
+    setReject((r) => ({ which: 'cipher', n: r && r.n === 1 ? 2 : 1 }))
+  }
+  const refuseEnter = (event) => { if (event.key === 'Enter') event.preventDefault() }
 
   const fire = () => {
-    const target = TARGETS[Math.floor(Math.random() * 3)]
+    // Station 3 is the operator's own paste and 4/5 are switched off, so in
+    // cipher mode the only thing downstream worth breaking is station 2.
+    const reachable = locked ? ['pack'] : TARGETS
+    const target = reachable[Math.floor(Math.random() * reachable.length)]
     const from = starRef.current?.getBoundingClientRect()
     const to = refs[target].current?.getBoundingClientRect()
     const box = panelRef.current?.getBoundingClientRect()
@@ -493,49 +679,65 @@ export function InspectFactory({ message, keypair, onClose, onRitual }) {
         <div ref={coinsRef} className="coin-host pointer-events-none absolute inset-0 z-20" />
 
         <div className="relative z-10 mb-4 flex items-center gap-3">
-          <span className="font-mono text-[10px] text-[#f4e4c1]/45">🔑 {E.toString()} · {shorten(N.toString(), 10)}</span>
+          <span className="font-mono text-[10px] text-[#f4e4c1]/45">🔑</span>
+          <CopyBit label={E.toString()} value={E.toString()} />
+          <span className="font-mono text-[10px] text-[#f4e4c1]/25">·</span>
+          <CopyBit beg label={shorten(N.toString(), 10)} value={N.toString()} />
           <button type="button" onClick={onClose} aria-label="close" className="ml-auto grid h-7 w-7 place-items-center border-2 border-[#ffd100]/60 font-mono text-[#ffd100] hover:bg-[#ffd100] hover:text-[#4a0410]">×</button>
         </div>
 
-        <div className="relative z-10 overflow-x-auto">
+        <GloryBar wpm={wpm} tier={tier} ratchet={ratchet} />
+
+        <div className="factory-scroll relative z-10 overflow-x-auto px-4 pb-12 pt-14">
           <div className="grid w-max" style={{ gridTemplateColumns: 'auto 4rem auto 4rem auto', gridTemplateRows: 'auto 7rem auto' }}>
 
-            <Station editable n={<Counter value={wpm} hot={tier >= 1} rage={tier >= 2} />} tone={dir === 'fwd' ? 'hot' : 'idle'}
-              footer={<DeskLamp lit={!!pulse} />}
-              rail={<><GloryGauge wpm={wpm} ratchet={ratchet} />{tip && <span className="tip-bubble">{draft.length === 0 ? FIRST_LINE : tooltipLine()}</span>}</>}>
-              <textarea value={source} rows={3} onChange={typeInto('fwd')}
-                className="w-full resize-none bg-transparent font-mono text-[11px] text-white caret-[#ffd100] outline-none" />
-              <div className="mt-1 h-1.5 w-full bg-black/50">
-                <div className={`h-full transition-all ${over ? 'bg-[#ff2d78]' : fuel < 0.75 ? 'bg-[#2dd4bf]' : 'bg-[#ffd100]'}`} style={{ width: `${fuel * 100}%` }} />
-              </div>
+            <Station editable reject={reject?.which === 'fwd' ? reject.n : 0} n={dir === 'fwd' ? <Counter value={wpm} idle="1" hot={tier >= 1} rage={tier >= 2} /> : '1'} tone={dir === 'fwd' ? 'hot' : toneOf(1)}
+              rail={tip ? <span className="tip-bubble">{draft.length === 0 ? FIRST_LINE : tooltipLine()}</span> : null}>
+              <textarea value={dir === 'cipher' ? (line.recovered || '') : source} rows={3}
+                onChange={typeInto('fwd')} onPaste={markPaste}
+                placeholder={dir === 'cipher' && !line.ok ? '\u25a1\u25a1\u25a1' : undefined}
+                className={`w-full resize-none bg-transparent font-mono text-[11px] caret-[#ffd100] outline-none placeholder:text-[#fff6dc]/30 ${dir === 'cipher' && !line.ok ? 'text-[#ff2d78]' : 'text-white'}`} />
             </Station>
-            <Pipe digits={bits(line.m, 6)} heat={heat} flowKey={flowKey} dead={broken(2)} reversed={dir === 'back'} />
+            <Pipe digits={bits(line.m, 6)} heat={heat} flowKey={flowKey} dead={pipeDead(1, 2)} reversed={locked} />
             <Station n="2" sealed tone={toneOf(2)} innerRef={refs.pack} seal={!broken(2)} onSeal={() => setSealAt(sealAt === 2 ? null : 2)}>
               <Digits value={line.m} rogueAt={rogueOf('pack', line.m)} />
             </Station>
-            <Pipe digits={bits(line.cipher, 6)} heat={heat} flowKey={flowKey} dead={broken(3)} reversed={dir === 'back'} />
-            <Station n="3" sealed tone={toneOf(3)} innerRef={refs.lock} seal={!broken(3)} onSeal={() => setSealAt(sealAt === 3 ? null : 3)}>
-              <Digits value={line.cipher} rogueAt={rogueOf('lock', line.cipher)} />
+            <Pipe digits={bits(line.cipher, 6)} heat={heat} flowKey={flowKey} dead={pipeDead(2, 3)} reversed={locked} />
+            <Station sealed reject={reject?.which === 'cipher' ? reject.n : 0}
+              n={locked ? <Counter value={wpm} idle="3" hot={tier >= 1} rage={tier >= 2} /> : '3'}
+              tone={locked ? 'hot' : toneOf(3)} innerRef={refs.lock}
+              head={<span className="flex items-center gap-1">
+                <button type="button" onClick={() => cipherRef.current?.focus()}
+                  className="station-edit-tag">paste</button>
+                {locked && <button type="button" onClick={() => { setCipherDraft(''); setDir('fwd') }}
+                  className="station-edit-tag">×</button>}
+              </span>}
+              seal={locked ? null : !broken(3)} onSeal={() => setSealAt(sealAt === 3 ? null : 3)}>
+              <textarea ref={cipherRef} rows={3} onChange={typeCipher} onPaste={markPaste}
+                onBeforeInput={refuseTyping} onKeyDown={refuseEnter}
+                value={locked ? cipherDraft : line.cipher}
+                placeholder="paste a cipher here"
+                className="relative z-[4] w-full resize-none bg-transparent font-mono text-[10px] text-[#fff6dc]/85 caret-[#ffd100] outline-none placeholder:text-[#fff6dc]/30" />
             </Station>
 
             <div className="col-span-4 grid translate-y-2 place-items-center" ref={starRef}><RayStar armed={!!ray} onFire={fire} eye={tier >= 2 ? Math.min(1, (wpm - 100) / 30 + 0.35) : 0} gaze={gaze} /></div>
-            <div className="grid place-items-center"><Pipe digits={bits(line.wire, 4)} heat={heat} flowKey={flowKey} reversed={dir === 'fwd'} dead={broken(4)} className="pipe-v" /></div>
+            <div className="grid place-items-center"><Pipe digits={bits(line.wire, 4)} heat={heat} flowKey={flowKey} off={locked} dead={pipeDead(3, 4)} className="pipe-v" /></div>
 
-            <Station editable n="5" tone={dir === 'back' && !broken(5) ? 'hot' : toneOf(5)} seal={line.sigOk} onSeal={() => setSealAt(sealAt === 5 ? null : 5)}
-              footer={<DeskLamp lit={!!pulse} />}>
-              <textarea rows={3} onChange={typeInto('back')}
-                value={dir === 'back' ? out : (line.recovered || '')}
-                placeholder="□□□"
-                className={`w-full resize-none bg-transparent font-mono text-[11px] caret-[#ffd100] outline-none placeholder:text-[#fff6dc]/30 ${line.ok ? 'text-white' : 'text-[#ff2d78]'}`} />
+            <Station n="5" sealed tone={locked ? 'off' : toneOf(5)} seal={locked ? null : line.sigOk} onSeal={() => setSealAt(sealAt === 5 ? null : 5)}>
+              <div className={`whitespace-pre-wrap break-all ${locked ? 'text-[#fff6dc]/20' : line.ok ? 'text-white' : 'text-[#ff2d78]'}`}>
+                {locked ? '□□□' : (line.recovered || '□□□')}
+              </div>
             </Station>
-            <Pipe digits={bits(line.wire, 10)} heat={heat} flowKey={flowKey} reversed={dir === 'fwd'} dead={broken(5)} className="col-span-3" />
-            <Station n="4" sealed tone={toneOf(4)} innerRef={refs.wire} seal={!broken(4)} onSeal={() => setSealAt(sealAt === 4 ? null : 4)}>
-              <Digits value={line.wire} rogueAt={rogueOf('wire', line.wire)} />
+            <Pipe digits={bits(line.wire, 10)} heat={heat} flowKey={flowKey} reversed off={locked} dead={pipeDead(4, 5)} className="col-span-3" />
+            <Station n="4" sealed tone={locked ? 'off' : toneOf(4)} innerRef={refs.wire}
+              seal={locked ? null : !broken(4)} onSeal={() => setSealAt(sealAt === 4 ? null : 4)}>
+              {locked ? <span className="text-[#fff6dc]/20">—</span>
+                      : <Digits value={line.wire} rogueAt={rogueOf('wire', line.wire)} />}
             </Station>
           </div>
         </div>
 
-        {sealAt != null && (
+        {sealAt != null && dir !== 'cipher' && (
           <div className="relative z-20 mt-3 w-fit border-2 border-[#ffd100]/60 bg-[#12010a] p-2.5 font-mono text-[10px] leading-5 text-[#fff6dc]/85 shadow-[6px_6px_0_rgba(0,0,0,.5)]">
             <p className="break-all">m<sup>D</sup> mod N · <Digits value={line.sig} rogueAt={ray && ray.target !== 'pack' ? Math.min(ray.at, line.sig.length - 1) : null} /></p>
             <p>s<sup>E</sup> mod N · <span className={line.sigOk ? 'text-[#2dd4bf]' : 'text-[#ff2d78]'}>{line.sigOk ? `"${line.attested}"` : '□□□'}</span></p>

@@ -16,6 +16,10 @@ export function sendMessage(sender, receiver, cipher, metadata = {}) {
   return makeEnvelope(sender, receiver, 'SEND', { cipher, ...metadata })
 }
 
+export function bridgesRequest(sender, plain = [], cipher = []) {
+  return makeEnvelope(sender, SERVER_ID, 'BRIDGES', { plain, cipher })
+}
+
 export function kerneyRequest(sender, prompt, messageId) {
   return makeEnvelope(sender, SERVER_ID, 'AI_KERNEY', { prompt, message_id: messageId })
 }
@@ -39,6 +43,7 @@ export function errorText(request) {
     ERR_AI_RATE_LIMIT: 'Kerney is still grading your previous question.',
     ERR_AI_UNAVAILABLE: 'Kerney AI is unavailable on the server right now.',
     ERR_BAD_AI_REQUEST: 'Kerney could not read that request.',
+    ERR_BRIDGES: 'BRIDGES would not take the structure.',
   }
   return messages[request] ?? 'Something went wrong.'
 }

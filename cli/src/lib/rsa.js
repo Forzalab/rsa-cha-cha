@@ -7,7 +7,27 @@
 // Speed is the priority over key strength here -- this is a class demo on a
 // projector, not a key that guards anything. Both knobs are below.
 
-export const PRIME_DIGITS = 64 // each prime; N ends up ~128 digits
+// Each prime; N lands at roughly twice this.
+//
+// Since chunking landed, total ciphertext length no longer depends on this
+// number at all. A block's cipher is about len(N) digits and you need
+// bytes/cap of them, where cap is about len(N)/2.408 -- the len(N) cancels.
+// Measured, same 183-byte paragraph:
+//
+//    64d -> N 128 digits, cap  53B, 4 blocks,  515 cipher chars
+//    72d -> N 144 digits, cap  59B, 4 blocks,  578 cipher chars
+//    96d -> N 192 digits, cap  79B, 3 blocks,  576 cipher chars
+//   128d -> N 255 digits, cap 105B, 2 blocks,  511 cipher chars
+//
+// So N now decides only two things: how many bytes ride in one block, and how
+// much screen a single number eats. 255 digits was a wall of text on the
+// inspect panel and bought nothing on the wire.
+//
+// The floor is the glory bar. cap x 2.4 is the reachable wpm ceiling and the
+// top tier is 130, so cap must stay above ~55 bytes or the counter can never
+// be filled -- the exact hard ceiling that took a patch to remove. 72-digit
+// primes give cap ~59 and a ceiling near 142. Do not go lower than 68.
+export const PRIME_DIGITS = 72
 export const MILLER_RABIN_ROUNDS = 5
 
 // ---------------------------------------------------------------- big-int math
@@ -203,24 +223,64 @@ export function maxBytesFor(modulus) {
   return bytes
 }
 
+// ---------------------------------------------------------------- blocks
+//
+// One modulus holds maxBytesFor(N) bytes and not one more. Longer text is cut
+// into that many bytes at a time, each block run through the same single
+// operation, and the results joined. Cost is linear in message length while
+// the key never moves -- growing N instead buys bytes linearly and pays for
+// them roughly cubically.
+//
+// A comma cannot occur inside a decimal string, so it separates cleanly and a
+// one-block ciphertext still looks exactly like it always did. Anything
+// encrypted before this change still decrypts.
+export const BLOCK_SEP = ','
+
+// Split on whole characters, never mid-codepoint. A multi-byte character that
+// straddled a block boundary would decode to a replacement glyph on the far
+// side, and the round trip would fail on a message that looked fine.
+function textBlocks(text, cap) {
+  const coder = new TextEncoder()
+  const blocks = []
+  let current = ''
+  for (const ch of text) {
+    if (current && coder.encode(current + ch).length > cap) {
+      blocks.push(current)
+      current = ''
+    }
+    current += ch
+  }
+  blocks.push(current)
+  return blocks
+}
+
 // ---------------------------------------------------------------- RSA
 
 export function encryptText(text, publicKey) {
   if (!publicKey?.modulus) throw new Error('No public key for that recipient.')
-  const packed = decimalFromText(text)
-  if (packed >= BigInt(publicKey.modulus)) {
-    throw new Error('Message is too long for that key.')
-  }
-  return modPow(packed, publicKey.value, publicKey.modulus).toString()
+  const cap = maxBytesFor(publicKey.modulus)
+  if (cap < 4) throw new Error('That key is too small to carry text.')
+  return textBlocks(String(text ?? ''), cap)
+    .map((block) => modPow(decimalFromText(block), publicKey.value, publicKey.modulus).toString())
+    .join(BLOCK_SEP)
 }
 
 export function decryptText(cipher, privateKey) {
   if (!privateKey?.modulus) throw new Error('No private key available.')
-  if (!/^\d+$/.test(String(cipher))) throw new Error('Ciphertext is not a decimal integer.')
-  return textFromDecimal(modPow(cipher, privateKey.value, privateKey.modulus))
+  const blocks = String(cipher).split(BLOCK_SEP)
+    .map((part) => part.trim())
+    .filter((part) => part.length)   // a stray leading or trailing comma is not an error
+  if (!blocks.length || blocks.some((part) => !/^\d+$/.test(part))) {
+    throw new Error('Ciphertext is not a decimal integer.')
+  }
+  return blocks
+    .map((part) => textFromDecimal(modPow(part, privateKey.value, privateKey.modulus)))
+    .join('')
 }
 
-// Item 3. Identical machinery, opposite key order.
+// Item 3. Identical machinery, opposite key order -- and because these are
+// literal aliases, signatures block and reassemble on exactly the same code
+// path as ciphertext. There is no second scheme to keep in step.
 export function signText(text, privateKey) {
   return encryptText(text, privateKey)
 }

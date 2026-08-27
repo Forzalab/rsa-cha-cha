@@ -219,8 +219,11 @@ summary, [role="button"] { cursor: pointer; }
   95%           { transform: rotate(3deg) scale(1.02);    filter: drop-shadow(0 0 2px rgba(255, 209, 0, .35)); }
 }
 .react-idle:hover svg { animation: none; }
-/* half a cycle behind, so the composer never twitches both icons at once */
-.react-idle--offset svg { animation-delay: 2.25s; }
+/* Equal durations re-synchronise every cycle no matter what delay they start
+   with. Different periods drift apart and never line up twice. */
+.react-idle--b svg { animation-duration: 5.3s; animation-delay: 1.4s; }
+.react-idle--c svg { animation-duration: 6.7s; animation-delay: 3.1s; }
+.react-idle--d svg { animation-duration: 8.1s; animation-delay: 0.6s; }
 
 /* ─── unsent draft nudge ─── */
 .send-nudge { animation: send-nudge 2.4s ease-in-out infinite; }
@@ -621,7 +624,7 @@ summary, [role="button"] { cursor: pointer; }
 .matrix-col {
   position: absolute; top: 0; width: 1ch;
   font-family: 'Space Mono', monospace; font-size: 12px; line-height: 1.15;
-  color: #967628; opacity: .055; text-shadow: 0 0 7px rgba(150,118,40,.45);
+  color: #604b1a; opacity: .018; text-shadow: 0 0 6px rgba(96,76,26,.3);
   word-break: break-all; white-space: normal;
   animation-name: matrix-fall; animation-timing-function: linear; animation-iteration-count: infinite;
 }
@@ -650,6 +653,13 @@ summary, [role="button"] { cursor: pointer; }
 }
 .pipe-rev .pipe-fluid { animation-direction: reverse; }
 @keyframes fluid-run { to { background-position: 16px 0; } }
+/* The riser inherited a 90deg gradient scrolling on X, so its bands ran
+   across the pipe instead of along it. Same stripe, rotated with the housing;
+   .pipe-rev still flips the direction because it only touches the axis sign. */
+.pipe-v .pipe-fluid { inset: 0;
+  background: repeating-linear-gradient(180deg, transparent 0 14px, rgba(255,209,0,.14) 14px 16px);
+  animation-name: fluid-run-v; }
+@keyframes fluid-run-v { to { background-position: 0 16px; } }
 .pipe-bit {
   position: absolute; left: -8%; transform: none; rotate: none; writing-mode: horizontal-tb;
   font-family: 'Space Mono', monospace; font-size: 11px; font-weight: 700;
@@ -658,32 +668,70 @@ summary, [role="button"] { cursor: pointer; }
 }
 .pipe-rev .pipe-bit { animation-name: bit-drift-rev; }
 .pipe-v .pipe-bit { left: 50%; margin-left: -3px; animation-name: bit-drift-down; }
+/* .pipe-rev .pipe-bit and .pipe-v .pipe-bit tie on specificity, and the
+   vertical rule sits later, so a reversed riser still drifted downward.
+   Two classes on one element outranks both. */
+.pipe-v.pipe-rev .pipe-bit { animation-name: bit-drift-up; }
 @keyframes bit-drift      { 0% { left: -8%; opacity: 0 } 12% { opacity: 1 } 88% { opacity: 1 } 100% { left: 104%; opacity: 0 } }
 @keyframes bit-drift-rev  { 0% { left: 104%; opacity: 0 } 12% { opacity: 1 } 88% { opacity: 1 } 100% { left: -8%; opacity: 0 } }
 @keyframes bit-drift-down { 0% { top: -10%; opacity: 0 } 12% { opacity: 1 } 88% { opacity: 1 } 100% { top: 104%; opacity: 0 } }
-.pipe-dead .pipe-fluid { animation-play-state: paused; filter: grayscale(1) brightness(.45); }
-.pipe-dead .pipe-bit { animation-play-state: paused; color: #7a4a55; text-shadow: none; }
+@keyframes bit-drift-up   { 0% { top: 104%; opacity: 0 } 12% { opacity: 1 } 88% { opacity: 1 } 100% { top: -10%; opacity: 0 } }
+/* A pipe downstream of a hit is not switched off -- it is on fire. Grey read
+   as "disabled"; the line is carrying corruption, and that is the whole point
+   of the star. Flow stops, the housing glows. */
+.pipe-dead {
+  border-top-color: #ff2d78; border-bottom-color: #6d0d29;
+  background: linear-gradient(180deg, #5c0a20 0%, #2a0410 45%, #150209 100%);
+  animation: pipe-burn 1.05s ease-in-out infinite;
+}
+.pipe-dead.pipe-v {
+  border-left-color: #ff2d78; border-right-color: #6d0d29;
+  background: linear-gradient(90deg, #5c0a20 0%, #2a0410 45%, #150209 100%);
+}
+@keyframes pipe-burn {
+  0%,100% { box-shadow: inset 0 0 12px rgba(0,0,0,.8), 0 0 7px 1px rgba(255,45,120,.4); }
+  50%     { box-shadow: inset 0 0 12px rgba(0,0,0,.8), 0 0 20px 5px rgba(255,45,120,.85); }
+}
+.pipe-dead .pipe-fluid { animation-play-state: paused; filter: none;
+  background: repeating-linear-gradient(90deg, transparent 0 14px, rgba(255,45,120,.24) 14px 16px); }
+.pipe-dead.pipe-v .pipe-fluid {
+  background: repeating-linear-gradient(180deg, transparent 0 14px, rgba(255,45,120,.24) 14px 16px); }
+.pipe-dead .pipe-bit { animation-play-state: paused; color: #ff5c92;
+  text-shadow: 0 0 9px rgba(255,45,120,.95), 0 0 14px rgba(0,0,0,.9); }
 
 /* station plating */
+/* The 6px 6px hard slab sat on top of the halo along the bottom and right,
+   so a symmetric drop-shadow still read as clipped on two sides. A soft
+   centred shadow lifts the plate off the matrix and leaves the glow alone. */
 .station-plate {
   position: relative;
   border: 3px solid #7a5f24;
   background: linear-gradient(180deg, #2a1109 0%, #1a0509 100%);
-  box-shadow: 6px 6px 0 rgba(0,0,0,.6), inset 0 1px 0 rgba(255,209,0,.14);
+  box-shadow: 0 5px 16px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,209,0,.14);
 }
-.rivet { position: absolute; width: 4px; height: 4px; border-radius: 50%;
-  background: radial-gradient(circle at 30% 30%, #ffd98a, #6b4a12); }
+/* Brass screw head, cross-slotted. The old 4px dot read as an unread badge
+   sitting in the corner of every panel -- four of them, on five panels. */
+.rivet { position: absolute; width: 7px; height: 7px; border-radius: 50%;
+  background: radial-gradient(circle at 32% 28%, #ffe7a8 0%, #d6a83c 36%, #8a6520 72%, #43300e 100%);
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.5), 0 1px 1px rgba(0,0,0,.55); }
+.rivet::before, .rivet::after { content: ''; position: absolute; left: 50%; top: 50%;
+  background: rgba(28,17,4,.8); }
+.rivet::before { width: 5px; height: 1.2px; transform: translate(-50%,-50%) rotate(24deg); }
+.rivet::after  { width: 1.2px; height: 5px; transform: translate(-50%,-50%) rotate(24deg); }
 .station-live .station-plate { border-color: #ffd100; animation: live-breathe 2s ease-in-out infinite; }
 /* Glow rides the filter channel so it never fights the hard offset shadow --
    animating both inside one box-shadow list is what made them overlap. */
 @keyframes live-breathe {
-  0%,100% { filter: drop-shadow(0 0 0 rgba(255,209,0,0)); }
-  50%     { filter: drop-shadow(0 0 13px rgba(255,209,0,.5)); }
+  0%,100% { filter: drop-shadow(0 0 5px rgba(255,209,0,.28)); }
+  50%     { filter: drop-shadow(0 0 17px rgba(255,209,0,.7)); }
 }
 .station-hit .station-plate { border-color: #ff2d78; animation: hit-siren .45s steps(2) infinite; }
+/* Same channel as live-breathe. A glow spread inside the box-shadow list sat
+   behind the 6px hard offset, so the top and left arcs got eaten and the halo
+   read as clipped. drop-shadow is symmetric on all four sides. */
 @keyframes hit-siren {
-  0%   { box-shadow: 6px 6px 0 rgba(0,0,0,.6), 0 0 20px 4px rgba(255,45,120,.6); }
-  100% { box-shadow: 6px 6px 0 rgba(0,0,0,.6), 0 0 6px 1px rgba(255,209,0,.3); }
+  0%   { filter: drop-shadow(0 0 17px rgba(255,45,120,.85)); }
+  100% { filter: drop-shadow(0 0 5px rgba(255,209,0,.35)); }
 }
 
 /* desk lamp -- hangs from the bottom edge of station 1, nothing else */
@@ -704,13 +752,32 @@ summary, [role="button"] { cursor: pointer; }
 /* damage */
 .rogue { color: #ff2d78; font-weight: 800; animation: rogue-flash .4s steps(2) infinite; }
 @keyframes rogue-flash { 0% { background: rgba(255,45,120,.45) } 100% { background: transparent } }
-.smoke { position: absolute; top: -4px; width: 10px; height: 10px; border-radius: 50%;
-  background: rgba(244,228,193,.45); filter: blur(2.5px); z-index: 11;
-  animation: smoke-rise 1.7s ease-out infinite; }
+.smoke { position: absolute; top: -6px; width: 16px; height: 16px; border-radius: 50%;
+  margin-left: -8px; --puff: 1;
+  background: radial-gradient(circle at 42% 40%, rgba(255,248,238,.9), rgba(214,198,170,.55) 55%, rgba(120,104,84,0) 78%);
+  filter: blur(3.5px); z-index: 11;
+  animation: smoke-rise 2.3s ease-out infinite; }
 @keyframes smoke-rise {
-  0% { transform: translateY(0) scale(.5); opacity: .75 }
-  100% { transform: translateY(-36px) scale(2); opacity: 0 }
+  0%   { transform: translateY(0) scale(calc(.35 * var(--puff))); opacity: 0 }
+  12%  { opacity: .95 }
+  60%  { opacity: .7 }
+  100% { transform: translateY(-48px) scale(calc(2.9 * var(--puff))); opacity: 0 }
 }
+/* The modulus wall. Two names, one motion -- alternating them is what makes
+   a held key shake every time instead of once. */
+.station-reject-a .station-plate { animation: reject-a .36s cubic-bezier(.36,.07,.19,.97); }
+.station-reject-b .station-plate { animation: reject-b .36s cubic-bezier(.36,.07,.19,.97); }
+.station-reject-a .station-plate,
+.station-reject-b .station-plate { border-color: #ff2d78; }
+@keyframes reject-a {
+  10%,90% { transform: translateX(-2px) } 20%,80% { transform: translateX(4px) }
+  30%,50%,70% { transform: translateX(-7px) } 40%,60% { transform: translateX(7px) }
+}
+@keyframes reject-b {
+  10%,90% { transform: translateX(-2px) } 20%,80% { transform: translateX(4px) }
+  30%,50%,70% { transform: translateX(-7px) } 40%,60% { transform: translateX(7px) }
+}
+
 .seal-panic { animation: seal-panic .34s ease-in-out infinite; }
 @keyframes seal-panic {
   0%,100% { transform: translateX(0) rotate(0) } 25% { transform: translateX(-2px) rotate(-8deg) }
@@ -742,7 +809,8 @@ summary, [role="button"] { cursor: pointer; }
 @media (prefers-reduced-motion: reduce) {
   .matrix-col, .pipe-fluid, .pipe-bit, .station-live .station-plate, .station-hit .station-plate,
   .desklamp, .desklamp-flare, .desklamp-flare .desklamp-bulb, .desklamp-flare .desklamp-cone,
-  .rogue, .smoke, .seal-panic, .star-outer, .star-inner, .ad-swap { animation: none !important; }
+  .rogue, .smoke, .seal-panic, .star-outer, .star-inner, .ad-swap,
+  .pipe-dead { animation: none !important; }
 }
 
 /* ---- sprint 2: counter, gauge, coins, tooltip, quake ---- */
@@ -764,6 +832,52 @@ summary, [role="button"] { cursor: pointer; }
 @keyframes counter-rage {
   0%   { transform: translate(-1px, 1px) }
   100% { transform: translate(1px, -1px) }
+}
+
+.glorybar { position: relative; z-index: 10; display: flex; justify-content: center;
+  margin: -2px 0 14px; }
+.glorybar-rig { position: relative; display: flex; align-items: center;
+  width: min(360px, 64%); }
+.glorybar-track { position: relative; flex: 1; height: 11px; overflow: hidden;
+  border: 1px solid rgba(255,209,0,.35); background: rgba(0,0,0,.62);
+  box-shadow: inset 0 2px 5px rgba(0,0,0,.85); }
+.glorybar-fill { position: absolute; left: 0; top: 0; bottom: 0;
+  background: linear-gradient(90deg, #2dd4bf, #ffd100 62%, #ffe873);
+  box-shadow: 0 0 10px rgba(255,209,0,.55);
+  transition: width .12s linear, background .3s; }
+.glorybar-notches { position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(90deg, transparent 0 7px, rgba(0,0,0,.5) 7px 9px); }
+.glorybar-tick { position: absolute; top: -1px; bottom: -1px; width: 2px; background: #7a5f24; }
+.glorybar-tick-lit { background: #fff6dc; box-shadow: 0 0 7px rgba(255,246,220,.95); }
+.glorybar-t2 .glorybar-fill { background: linear-gradient(90deg, #ffd100, #ff8a3d 70%, #ffe873); }
+.glorybar-t3 .glorybar-fill { background: linear-gradient(90deg, #ff8a3d, #b4ff78 60%, #39ff14); }
+.glorybar-t2 .glorybar-track,
+.glorybar-t3 .glorybar-track { border-color: #b4ff78; box-shadow: inset 0 2px 5px rgba(0,0,0,.85), 0 0 12px rgba(120,255,90,.45); }
+.glorybar-ratchet { animation: glorybar-ratchet .4s cubic-bezier(.3,1.6,.4,1); }
+@keyframes glorybar-ratchet {
+  0% { transform: scaleY(1) } 45% { transform: scaleY(1.9) } 100% { transform: scaleY(1) }
+}
+
+/* Past the second tick the vessel is full and the fill stops respecting it.
+   The spill is a sibling of the track, so overflow:hidden never sees it. */
+.glorybar-spill { position: relative; height: 11px; margin-left: -1px; flex: none;
+  filter: drop-shadow(0 0 calc(6px + var(--spill) * 12px) rgba(120,255,90,.9)); }
+.glorybar-ooze { position: absolute; inset: 0;
+  background: linear-gradient(90deg, #ffe873 0%, #b4ff78 30%, #39ff14 68%, rgba(57,255,20,0) 100%);
+  clip-path: polygon(0 0, 88% 14%, 100% 50%, 88% 86%, 0 100%);
+  animation: ooze-crawl 1.1s ease-in-out infinite alternate; }
+@keyframes ooze-crawl {
+  0%   { transform: scaleY(1);   filter: brightness(1) }
+  100% { transform: scaleY(1.6); filter: brightness(1.35) }
+}
+.glorybar-fume { position: absolute; top: -1px; right: 10%; width: 13px; height: 13px;
+  border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle at 44% 44%, rgba(214,255,190,.95), rgba(120,255,90,.4) 55%, rgba(57,255,20,0) 78%);
+  filter: blur(3px); animation: fume-rise 1.9s ease-out infinite; }
+@keyframes fume-rise {
+  0%   { transform: translate(0, 3px) scale(.35); opacity: 0 }
+  14%  { opacity: .95 }
+  100% { transform: translate(-16px, -38px) scale(2.8); opacity: 0 }
 }
 
 .gauge { position: absolute; right: -13px; top: 6px; bottom: 6px; width: 8px;
@@ -812,7 +926,9 @@ summary, [role="button"] { cursor: pointer; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .counter-rage, .gauge-ratchet, .coin, .panel-quake, .tip-bubble, .counter-woke { animation: none !important; }
+  .counter-rage, .gauge-ratchet, .coin, .panel-quake, .tip-bubble, .counter-woke,
+  .glorybar-ratchet, .glorybar-ooze, .glorybar-fume,
+  .station-reject-a .station-plate, .station-reject-b .station-plate { animation: none !important; }
   .panel-quake { transform: none !important; }
 }
 
@@ -1040,7 +1156,33 @@ summary, [role="button"] { cursor: pointer; }
   box-shadow: inset 0 2px 6px rgba(0,0,0,.7), inset 0 -1px 0 rgba(255,209,0,.18);
   border: 1px solid rgba(255,209,0,.22);
 }
-.station-console textarea { cursor: text; }
+.station-console textarea { cursor: text; padding-left: 13px; }
+
+/* Terminal prompt. A pencil glyph is decoration; a $ with a live caret next
+   to it is the only sign anyone actually reads as "type here". */
+.station-console .station-plate > div:last-child { position: relative; }
+.station-console .station-plate > div:last-child::before {
+  content: '$'; position: absolute; left: 8px; top: 8px; z-index: 2;
+  font-family: 'Space Mono', monospace; font-size: 11px; line-height: 16px;
+  font-weight: 700; color: #ffd100; opacity: .75; pointer-events: none;
+}
+.station-console:focus-within .station-plate > div:last-child::before {
+  opacity: 1; animation: prompt-blink 1.1s steps(2) infinite;
+}
+@keyframes prompt-blink { 0%,100% { opacity: 1 } 50% { opacity: .35 } }
+
+/* The header tag. Bordered, uppercase, mono -- shaped like a key you press. */
+.station-edit-tag {
+  display: inline-flex; align-items: center; height: 15px; padding: 0 5px;
+  border: 1px solid rgba(255,209,0,.55); background: rgba(255,209,0,.1);
+  font-family: 'Space Mono', monospace; font-size: 8px; font-weight: 700;
+  letter-spacing: .2em; text-transform: uppercase; color: #ffd100;
+  transition: background .15s, color .15s;
+}
+.station-console:hover .station-edit-tag,
+.station-console:focus-within .station-edit-tag {
+  background: #ffd100; color: #4a0410;
+}
 
 /* Sealed: the oven door. Brushed-steel frame, double glass, one diagonal
    reflection streak, a handle bar across the top of the window. */
@@ -1102,4 +1244,66 @@ summary, [role="button"] { cursor: pointer; }
 
 @media (prefers-reduced-motion: reduce) {
   .pipe-chevrons { animation: none !important; opacity: 0 !important; }
+  .station-console:focus-within .station-plate > div:last-child::before { animation: none !important; }
+}
+
+/* ------------------------------------------------------------ BRIDGES + copy
+   The composer's bridge button pulses only while the server is mid-POST. */
+.bridge-wait { display: grid; place-items: center;
+  animation: bridge-wait 1.05s ease-in-out infinite; }
+@keyframes bridge-wait {
+  0%, 100% { opacity: .5; transform: scale(.9);
+             filter: drop-shadow(0 0 0 rgba(255,209,0,0)); }
+  50%      { opacity: 1;  transform: scale(1.08);
+             filter: drop-shadow(0 0 9px rgba(255,209,0,.95)); }
+}
+
+/* No border, no label, no chrome. It should read as part of the number until
+   the pointer is on it. */
+.copybit { display: inline-flex; align-items: center; gap: 4px;
+  padding: 0; border: 0; background: none; cursor: pointer;
+  font-family: 'Space Mono', monospace; font-size: 10px;
+  color: rgba(244,228,193,.45); }
+.copybit:hover { color: #ffd100; }
+.copybit-mark { width: 11px; height: 11px; flex: none;
+  opacity: .3; transition: opacity .15s; }
+.copybit:hover .copybit-mark, .copybit:focus-visible .copybit-mark { opacity: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  .bridge-wait { animation: none !important; opacity: .8; }
+}
+
+/* ------------------------------------------------------- switched-off stages
+   Not damaged. Not running. Nothing is feeding them, and the eye should read
+   that as different from the red burning state. */
+.station-off { opacity: .38; filter: grayscale(1) brightness(.8); }
+.station-off .station-plate { border-color: rgba(255,209,0,.18); box-shadow: none; }
+.station-off .station-plate, .station-off * { animation: none !important; }
+
+.pipe-off { filter: grayscale(1) brightness(.55); opacity: .4; }
+.pipe-off .pipe-fluid { animation: none !important; opacity: .25; }
+.pipe-off .pipe-bit { display: none; }
+
+/* The scroller has overflow-x, which forces a computed overflow-y and a hard
+   scrollport edge. Smoke rising through it was being cut with a razor. Fade
+   the top band instead -- the plates sit below it on pt-14 clearance, so only
+   the plumes ever reach the gradient. */
+.factory-scroll {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 52px);
+          mask-image: linear-gradient(to bottom, transparent 0, #000 52px);
+}
+
+/* ------------------------------------------------------------- copy me
+   Loud until obeyed once, then silent forever. */
+.copybit-beg .copybit-mark { opacity: 1; color: #ffd100;
+  animation: copy-beg 1.6s ease-in-out infinite; }
+.copybit-ghost { font-family: 'Space Mono', monospace; font-size: 9px;
+  letter-spacing: .12em; text-transform: uppercase; color: #ffd100;
+  animation: copy-beg 1.6s ease-in-out infinite; }
+@keyframes copy-beg {
+  0%, 100% { opacity: .35; transform: scale(1); filter: drop-shadow(0 0 0 rgba(255,209,0,0)); }
+  50%      { opacity: 1;   transform: scale(1.22); filter: drop-shadow(0 0 7px rgba(255,209,0,.95)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .copybit-beg .copybit-mark, .copybit-ghost { animation: none !important; opacity: 1; }
 }
