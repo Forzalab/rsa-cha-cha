@@ -813,3 +813,48 @@ summary, [role="button"] { cursor: pointer; }
   .counter-rage, .gauge-ratchet, .coin, .panel-quake, .tip-bubble, .counter-woke { animation: none !important; }
   .panel-quake { transform: none !important; }
 }
+
+/* ---------------------------------------------------------------- ritual
+   Full-screen takeover. Strobe period is 345ms == 2.9Hz, which is under the
+   photosensitivity threshold. Do not shorten it. */
+.ritual { position: fixed; inset: 0; z-index: 120; display: grid; place-items: center;
+  overflow: hidden; pointer-events: all; }
+.ritual-stack { display: flex; flex-direction: column; align-items: center; gap: .25em;
+  font-family: 'Titan One', 'Comic Neue', cursive; font-size: clamp(2.1rem, 9vw, 6rem);
+  line-height: .95; letter-spacing: .04em; text-align: center;
+  padding: 0 6vw; word-break: break-word; }
+.ritual-word { display: block; }
+
+.ritual--self { background: #f7f2e6; color: #c00014; }
+.ritual--self.ritual--flip { background: #c00014; color: #f7f2e6; }
+.ritual--witness { background: #06040a; color: #ffd100; }
+.ritual--witness.ritual--flip { background: #1a0509; color: #fff6dc; }
+
+.ritual-caption { position: absolute; bottom: 8vh; font-family: 'Comic Neue', cursive;
+  font-size: 14px; letter-spacing: .3em; }
+
+.ritual-marquee { position: absolute; overflow: hidden; white-space: nowrap;
+  font-family: 'Comic Neue', cursive; font-size: 13px; font-weight: 700;
+  color: #ffe873; opacity: .8; }
+.ritual-marquee span { display: inline-block; animation: ritual-slide 6s linear infinite; }
+.ritual-marquee--top { top: 0; left: 0; right: 0; height: 22px; }
+.ritual-marquee--bottom { bottom: 0; left: 0; right: 0; height: 22px; }
+.ritual-marquee--left { top: 0; bottom: 0; left: 0; width: 22px;
+  writing-mode: vertical-rl; }
+.ritual-marquee--right { top: 0; bottom: 0; right: 0; width: 22px;
+  writing-mode: vertical-rl; }
+@keyframes ritual-slide {
+  from { transform: translateX(0) } to { transform: translateX(-50%) }
+}
+.ritual-marquee--left span, .ritual-marquee--right span {
+  animation-name: ritual-slide-v;
+}
+@keyframes ritual-slide-v {
+  from { transform: translateY(0) } to { transform: translateY(-50%) }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ritual--calm, .ritual { animation: none !important; }
+  .ritual-marquee span { animation: none !important; }
+  .ritual--calm { background: #06040a; color: #ffd100; }
+}

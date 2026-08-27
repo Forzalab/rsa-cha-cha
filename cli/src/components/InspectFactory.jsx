@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { decimalFromText, textFromDecimal, modPow, maxBytesFor } from '../lib/rsa.js'
-import { markTier, tooltipLine } from '../lib/ritualState.js'
+import { markTakeover, markTier, tooltipLine } from '../lib/ritualState.js'
 
 // An empty box gets the plain invitation, always. "faster, comrade" means
 // nothing to somebody who has not typed a character yet.
@@ -301,7 +301,7 @@ function MatrixField({ seed, heat = 0 }) {
 const TARGETS = ['pack', 'lock', 'wire']
 const STAGE_OF = { pack: 2, lock: 3, wire: 4 }
 
-export function InspectFactory({ message, keypair, onClose }) {
+export function InspectFactory({ message, keypair, onClose, onRitual }) {
   const [draft, setDraft] = useState(message?.plaintext || 'HELLO')
   const [ray, setRay] = useState(null)
   const [beam, setBeam] = useState(null)
@@ -359,13 +359,18 @@ export function InspectFactory({ message, keypair, onClose }) {
   useEffect(() => {
     if (tier > lastTierRef.current) {
       markTier(tier)
+      // 100 wpm announces you. 130 takes the room.
+      if (tier >= 2) {
+        if (tier >= 3) markTakeover()
+        onRitual?.(tier)
+      }
       setRatchet(true)
       const id = setTimeout(() => setRatchet(false), 420)
       lastTierRef.current = tier
       return () => clearTimeout(id)
     }
     if (tier < lastTierRef.current) lastTierRef.current = tier
-  }, [tier])
+  }, [tier, onRitual])
 
   // Idle nagging. Silent the moment anything is being typed.
   useEffect(() => {

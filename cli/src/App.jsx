@@ -11,6 +11,8 @@ import { ping, unlockPing } from './lib/ping.js'
 import { CipherReveal } from './components/CipherReveal.jsx'
 import { PropagandaFrame } from './components/PropagandaFrame.jsx'
 import { InspectFactory, OvaltineAd, SidebarAd } from './components/InspectFactory.jsx'
+import { RitualTakeover } from './components/RitualTakeover.jsx'
+import { closeSlug, seekSlug } from './lib/zalgo.js'
 
 const MAX_MESSAGE_LENGTH = 500
 const SEND_COOLDOWN_MS = 400
@@ -141,7 +143,11 @@ function JoinSlug({ notice }) {
     ? 'text-[#ffd100] slug-jackpot'
     : notice.kind === 'rosas'
       ? 'text-[#ff86ae]'
-      : 'text-[#fff6dc]/45'
+      : notice.kind === 'ritual'
+        ? 'text-[#ffe873] slug-jackpot'
+        : notice.kind === 'ritual-close'
+          ? 'text-[#c7b28a]/70'
+          : 'text-[#fff6dc]/45'
   return (
     <div className="join-slug my-1 flex items-center gap-2.5 px-4">
       <span className="h-px flex-1 bg-[#fff6dc]/12" />
@@ -235,6 +241,34 @@ export default function App() {
 
     if (others.some(isKerney)) runJackpot()
   }, [chat.members])
+
+  // Ritual plumbing. Tier 2 is a slug only. Tier 3 mounts the takeover, and
+  // the closing slug is posted when the overlay releases -- so every bystander
+  // has a thread to pull instead of believing the site broke.
+  const [takeover, setTakeover] = useState(null)
+  const ritualSeenRef = useRef(null)
+  const pushNotice = useCallback((kind, text) => {
+    setNotices((current) => [
+      ...current,
+      { id: `${kind}:${Date.now()}:${current.length}`, anchor: chat.messages.length, kind, text },
+    ])
+  }, [chat.messages.length])
+
+  useEffect(() => {
+    const event = chat.ritualEvent
+    if (!event || ritualSeenRef.current === event.id) return
+    ritualSeenRef.current = event.id
+    pushNotice('ritual', seekSlug(event.name))
+    if (event.tier >= 3) setTakeover(event)
+    chat.clearRitual()
+  }, [chat.ritualEvent])
+
+  const endTakeover = useCallback(() => {
+    setTakeover((current) => {
+      if (current) pushNotice('ritual-close', closeSlug(current.name))
+      return null
+    })
+  }, [pushNotice])
 
   const noticesAt = (index) => notices.filter((notice) => notice.anchor === index)
 
@@ -531,7 +565,8 @@ export default function App() {
         </div>
       </section>
       {inspecting && adGate && <OvaltineAd onSkip={() => { setAdGate(false); setAdSeen(true) }} />}
-{inspecting && !adGate && <InspectFactory message={inspecting} keypair={chat.keypair} onClose={() => setInspecting(null)} />}
+{inspecting && !adGate && <InspectFactory message={inspecting} keypair={chat.keypair} onClose={() => setInspecting(null)} onRitual={chat.sendRitual} />}
+      {takeover && <RitualTakeover name={takeover.name} self={takeover.self} onDone={endTakeover} />}
     </main>
   )
 }
