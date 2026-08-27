@@ -1,11 +1,13 @@
-// Sidebar ads. Three things happen here.
+// Sidebar ads that stopped staying in the sidebar.
 //
-// 1. Decay -- the creatives rot in four stages driven by ritual.score. Nobody
-//    is told. A visitor who never types fast never sees stage 1.
-// 2. Hydra -- dismissing one spawns two. Ignoring one spawns one. Cap 5.
-//    Eight dismissals in a row clears the board and stops spawning for 30s,
-//    so a demo can never be buried under its own joke.
-// 3. Subliminal -- a 130ms 🥛→👁 frame, twice per session at most.
+// 1. Flow    -- a fixed layer anchored bottom right. Cards fill a column
+//               upward, then start a new column to the left, over the chat.
+//               There is no cap you can reach by hand.
+// 2. Hydra   -- dismissing one spawns two, staggered. Ignoring one spawns one.
+//               Eight dismissals in a row clears the board and sleeps 30s, so
+//               a demo can never be buried.
+// 3. Decay   -- creatives rot in four stages driven by ritual.score.
+// 4. Subliminal -- a 130ms milk-to-eye frame, twice per session at most.
 
 import { useEffect, useRef, useState } from 'react'
 import { ritual } from '../lib/ritualState.js'
@@ -13,37 +15,38 @@ import { zalgo } from '../lib/zalgo.js'
 
 const OVALTINE_SRC = '/ovaltine.png'
 
-// Each creative carries its own decay. `wrong` breaks one detail; `broken`
-// breaks the meaning. Stage 3 corrupts whatever stage 2 produced.
+// A number no hand reaches, kept only so a runaway timer cannot eat the DOM.
+const HARD_CEILING = 60
+
+// `skin` picks the palette. `wrong` breaks one detail; `broken` breaks the
+// meaning. Stage 3 corrupts whatever stage 2 produced.
 const CREATIVES = [
-  { top: 'CRACKER JACK', big: 'A PRIZE IN EVERY BOX',
+  { skin: 'jack', top: 'CRACKER JACK', big: 'A PRIZE IN EVERY BOX',
     small: 'some assembly required',
     wrong: 'some assembly requried',
-    broken: 'A PRIZE IN EVERY BOY' },
-  { top: '敖华田', big: 'DRINK YOUR OVALTINE',
-    small: 'a crummy commercial',
-    wrong: 'a crummy commerical',
-    broken: 'DRINK YOUR OBEDIENCE' },
-  { top: 'DECODER RING', big: 'BE SURE TO TURN TO B-2',
-    small: 'pin included',
-    wrong: 'pin incuded',
-    broken: 'BE SURE TO TURN TO US' },
-  { top: 'BAZOOKA JOE', big: 'FORTUNE ON THE WRAPPER',
+    broken: 'A PRIZE IN EVERY BOY', art: true },
+  { skin: 'ovaltine', top: 'Ovaltine', big: 'BOOST BRAIN POWER',
+    small: 'GROW UP STRONGER',
+    wrong: 'GROW UP STONGER',
+    broken: 'BOOST BRAIN CONTROL', art: true },
+  { skin: 'xmas', top: 'DECODER RING', big: 'Be Sure To Turn To B-2',
+    small: 'pin included \u00b7 allow six weeks',
+    wrong: 'pin incuded \u00b7 allow six weeks',
+    broken: 'Be Sure To Turn To Us' },
+  { skin: 'bazooka', top: 'BAZOOKA JOE', big: 'FORTUNE ON THE WRAPPER',
     small: 'chew first, read later',
     wrong: 'chew first, read latre',
     broken: 'FORTUNE ON THE WATCHER' },
-  { top: 'ENIGMA CO.', big: 'THREE ROTORS, ONE PRICE',
-    small: 'refurbished',
-    wrong: 'refurbished (mostly)',
+  { skin: 'enigma', top: 'ENIGMA CO.', big: 'THREE ROTORS, ONE PRICE',
+    small: 'refurbished \u00b7 ref. 1938/B',
+    wrong: 'refurbished \u00b7 ref. 1938/8',
     broken: 'THREE ROTORS, ONE VOICE' },
-  { top: '素数', big: 'PRIMES, BULK RATE',
+  { skin: 'primes', top: '\u7d20\u6570', big: 'PRIMES, BULK RATE',
     small: 'p and q sold as a pair',
     wrong: 'p and q sold as a pear',
     broken: 'PRIMES, BULK FAITH' },
 ]
 
-// score 0 is clean. The steps are deliberately far apart -- a casual visitor
-// must never reach stage 2 by accident.
 export function decayStage(score) {
   if (score >= 8) return 3
   if (score >= 4) return 2
@@ -65,7 +68,7 @@ function dress(creative, stage) {
 
 // ---------------------------------------------------------------- one card
 
-function CrackerJackCard({ seed, stage, onDismiss }) {
+function AdCard({ seed, stage, onDismiss }) {
   const [i, setI] = useState(seed % CREATIVES.length)
   const [failed, setFailed] = useState(false)
   useEffect(() => {
@@ -75,16 +78,16 @@ function CrackerJackCard({ seed, stage, onDismiss }) {
 
   const c = dress(CREATIVES[i], stage)
   return (
-    <div className={`cj-card ${stage >= 3 ? 'cj-card--rot' : ''}`}>
+    <div className={`cj-card cj-card--${c.skin} ${stage >= 3 ? 'cj-card--rot' : ''}`}>
       <span className="cj-dots" aria-hidden="true" />
-      <button type="button" onClick={onDismiss} aria-label="Close advertisement" className="cj-close">×</button>
+      <button type="button" onClick={onDismiss} aria-label="Close advertisement" className="cj-close">&times;</button>
       <span className="cj-burst" aria-hidden="true">FREE</span>
       <div key={i} className="ad-swap cj-body">
         <p className="cj-top">{c.top}</p>
         <p className="cj-big">{c.big}</p>
         <p className="cj-small">{c.small}</p>
       </div>
-      {!failed && <img src={OVALTINE_SRC} alt="" onError={() => setFailed(true)} className="cj-image" />}
+      {c.art && !failed && <img src={OVALTINE_SRC} alt="" onError={() => setFailed(true)} className="cj-image" />}
       <div className="cj-rail">
         {CREATIVES.map((_, n) => <span key={n} className={n === i ? 'cj-pip cj-pip--on' : 'cj-pip'} />)}
       </div>
@@ -102,11 +105,11 @@ export function AdStack() {
   const [subliminal, setSubliminal] = useState(false)
   const streakRef = useRef(0)
   const sleepUntilRef = useRef(0)
+  const ambientRef = useRef(null)
   const timersRef = useRef([])
 
-  // ritual.score is a plain mutable object, so React never hears about it.
-  // Poll it. Two seconds is far below the time it takes to earn a stage and
-  // costs one integer compare.
+  // ritual.score is a plain mutable object, so React never hears it change.
+  // Poll it. Two seconds is far under the time it takes to earn a stage.
   const [stage, setStage] = useState(() => decayStage(ritual.score))
   useEffect(() => {
     const id = window.setInterval(() => setStage(decayStage(ritual.score)), 2000)
@@ -116,40 +119,57 @@ export function AdStack() {
   const schedule = (fn, ms) => {
     const id = window.setTimeout(fn, ms)
     timersRef.current.push(id)
+    return id
   }
 
-  useEffect(() => () => timersRef.current.forEach(window.clearTimeout), [])
-
-  const spawn = (count) => {
+  const spawn = (count = 1) => {
     if (Date.now() < sleepUntilRef.current) return
     setCards((current) => {
-      const room = Math.max(0, 5 - current.length)
-      const made = Array.from({ length: Math.min(count, room) }, () => ({ id: nextId++ }))
-      return [...current, ...made]
+      if (current.length >= HARD_CEILING) return current
+      const room = Math.min(count, HARD_CEILING - current.length)
+      return [...current, ...Array.from({ length: room }, () => ({ id: nextId++ }))]
     })
   }
 
-  // Leaving one alone still costs you one, slower. This is what makes the
-  // dismissal streak a real choice rather than a free win.
+  // One ambient clock for the whole board. A per-card timer restarted itself
+  // on every length change, which is what put two cards in the same frame.
+  const armAmbient = (extra = 0) => {
+    window.clearTimeout(ambientRef.current)
+    ambientRef.current = window.setTimeout(() => {
+      spawn(1)
+      armAmbient()
+    }, between(10000, 15000) + extra)
+  }
+
   useEffect(() => {
-    if (!cards.length) return
-    const id = window.setTimeout(() => spawn(1), between(10000, 15000))
-    return () => window.clearTimeout(id)
-  }, [cards.length])
+    armAmbient()
+    return () => {
+      window.clearTimeout(ambientRef.current)
+      timersRef.current.forEach(window.clearTimeout)
+    }
+  }, [])
 
   const dismiss = (id) => {
     streakRef.current += 1
     setCards((current) => current.filter((card) => card.id !== id))
 
+    // A card leaving and a card arriving in the same frame reads as a glitch.
+    // Push the ambient spawn clear of the exit.
+    armAmbient(900)
+
     if (streakRef.current >= 8) {
       streakRef.current = 0
       sleepUntilRef.current = Date.now() + 30000
+      window.clearTimeout(ambientRef.current)
+      schedule(() => armAmbient(), 30000)
       setCards([])
       return
     }
-    schedule(() => spawn(2), between(5000, 7000))
 
-    // The frame only ever fires once the ads have started lying.
+    // Two heads, never on the same tick.
+    schedule(() => spawn(1), between(5000, 7000))
+    schedule(() => spawn(1), between(5400, 7400))
+
     if (stage >= 2 && ritual.subliminals < 2) {
       ritual.subliminals += 1
       setSubliminal(true)
@@ -158,11 +178,13 @@ export function AdStack() {
   }
 
   return (
-    <div className="flex flex-col gap-1.5">
-      {cards.map((card) => (
-        <CrackerJackCard key={card.id} seed={card.id} stage={stage} onDismiss={() => dismiss(card.id)} />
-      ))}
-      {subliminal && <div className="subliminal" aria-hidden="true">👁</div>}
-    </div>
+    <>
+      <div className="ad-swarm" aria-label="advertisements">
+        {cards.map((card) => (
+          <AdCard key={card.id} seed={card.id} stage={stage} onDismiss={() => dismiss(card.id)} />
+        ))}
+      </div>
+      {subliminal && <div className="subliminal" aria-hidden="true">&#128065;</div>}
+    </>
   )
 }

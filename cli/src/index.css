@@ -859,36 +859,131 @@ summary, [role="button"] { cursor: pointer; }
   .ritual--calm { background: #06040a; color: #ffd100; }
 }
 
-/* ------------------------------------------------------- cracker-jack ads
-   1950s box art: cream stock, halftone, script over a shout. Sits against a
-   red-and-gold room on purpose -- it should look like it wandered in. */
-.cj-card { position: relative; overflow: hidden; background: #fff8ee;
-  border: 3px solid #1a0509; box-shadow: 4px 4px 0 rgba(0,0,0,.55);
-  font-family: 'Baloo 2', 'Comic Neue', cursive; }
+/* ----------------------------------------------------------------- ad swarm
+   Fixed layer, bottom-right. A column fills upward; when it runs out of
+   height the next column starts to its left, over the chat. Nothing about
+   this respects the sidebar any more. That is the joke. */
+.ad-swarm { position: fixed; inset: 0; z-index: 45; pointer-events: none;
+  display: flex; flex-flow: column wrap-reverse;
+  align-content: flex-start; justify-content: flex-end;
+  gap: 6px; padding: 8px; direction: rtl; }
+.ad-swarm > * { direction: ltr; pointer-events: auto; }
+
+/* ------------------------------------------------------------------- a card
+   Shared furniture. Every skin below only repaints the four variables and
+   the three type rules. */
+.cj-card { --paper: #fff8ee; --ink: #1a0509; --accent: #c0392b; --sub: #6b5836;
+  position: relative; width: 200px; overflow: hidden;
+  background: var(--paper); border: 3px solid var(--ink);
+  box-shadow: 4px 4px 0 rgba(0,0,0,.55);
+  font-family: 'Baloo 2', 'Comic Neue', cursive;
+  animation: cj-in .22s cubic-bezier(.2,1.4,.4,1); }
+@keyframes cj-in {
+  from { opacity: 0; transform: translateY(8px) scale(.96) }
+  to   { opacity: 1; transform: none }
+}
 .cj-dots { position: absolute; inset: 0; pointer-events: none; opacity: .16;
-  background-image: radial-gradient(#c0392b 1px, transparent 1.2px);
+  background-image: radial-gradient(var(--accent) 1px, transparent 1.2px);
   background-size: 5px 5px; }
 .cj-close { position: absolute; right: 2px; top: 2px; z-index: 3;
   width: 14px; height: 14px; display: grid; place-items: center;
   font-family: 'Anton', sans-serif; font-size: 14px; line-height: 1;
-  color: #1a0509; background: none; }
-.cj-close:hover { color: #c0392b; }
+  color: var(--ink); background: none; }
+.cj-close:hover { color: var(--accent); }
 .cj-burst { position: absolute; left: -12px; top: 12px; z-index: 2;
   transform: rotate(-18deg); padding: 2px 14px;
-  background: #c0392b; color: #ffe9b0;
+  background: var(--accent); color: var(--paper);
   font-family: 'Anton', sans-serif; font-size: 8px; letter-spacing: .18em; }
-.cj-body { position: relative; z-index: 1; padding: 8px 8px 4px 8px; text-align: center; }
-.cj-top { font-family: 'Lobster', cursive; font-size: 13px; color: #c0392b;
-  line-height: 1; }
+.cj-body { position: relative; z-index: 1; padding: 8px 8px 4px; text-align: center; }
+.cj-top { font-family: 'Lobster', cursive; font-size: 13px; line-height: 1;
+  color: var(--accent); }
 .cj-big { margin-top: 2px; font-family: 'Anton', sans-serif; font-size: 12px;
-  line-height: 1.05; letter-spacing: .01em; color: #1a0509; }
-.cj-small { margin-top: 2px; font-size: 9px; color: #6b5836; }
+  line-height: 1.05; color: var(--ink); }
+.cj-small { margin-top: 2px; font-size: 9px; color: var(--sub); }
 .cj-image { position: relative; z-index: 1; height: 38px; width: 100%;
   object-fit: cover; filter: sepia(.5) contrast(1.1); }
-.cj-rail { position: relative; z-index: 1; display: flex; gap: 2px;
-  padding: 3px 6px 4px; }
-.cj-pip { height: 2px; flex: 1; background: rgba(26,5,9,.18); }
-.cj-pip--on { background: #c0392b; }
+.cj-rail { position: relative; z-index: 1; display: flex; gap: 2px; padding: 3px 6px 4px; }
+.cj-pip { height: 2px; flex: 1; background: color-mix(in srgb, var(--ink) 18%, transparent); }
+.cj-pip--on { background: var(--accent); }
+
+/* --- Ovaltine. Orange burst, blue block caps outlined in white, red flash. */
+.cj-card--ovaltine { --paper: #ff8c00; --ink: #16357f; --accent: #e2231a; --sub: #fff3d0;
+  background: radial-gradient(circle at 52% 30%, #ffe27a 0%, #ffb416 34%, #ff7a00 100%); }
+.cj-card--ovaltine .cj-dots { opacity: 0; }
+.cj-card--ovaltine .cj-top { font-family: 'Lobster', cursive; font-size: 15px;
+  color: #fff; text-shadow: 0 0 0 #16357f, 1.5px 1.5px 0 #16357f, -1.5px 1.5px 0 #16357f,
+  1.5px -1.5px 0 #16357f, -1.5px -1.5px 0 #16357f; }
+.cj-card--ovaltine .cj-big { font-size: 14px; letter-spacing: -.01em; color: #16357f;
+  text-shadow: 1.5px 1.5px 0 #fff, -1.5px 1.5px 0 #fff, 1.5px -1.5px 0 #fff, -1.5px -1.5px 0 #fff;
+  transform: rotate(-2deg); }
+.cj-card--ovaltine .cj-small { margin-top: 4px; font-family: 'Anton', sans-serif;
+  font-size: 9px; letter-spacing: .1em; color: #16357f; }
+.cj-card--ovaltine .cj-image { filter: saturate(1.35) contrast(1.05); }
+
+/* --- Decoder ring. A Christmas Story: cream stock, black rules, red script
+       with a green keyline, serif fine print. */
+.cj-card--xmas { --paper: #f6f3ea; --ink: #14100c; --accent: #c8102e; --sub: #3c3a33;
+  border-width: 2px; }
+.cj-card--xmas .cj-dots { opacity: 0; }
+.cj-card--xmas .cj-body { padding-top: 12px; }
+.cj-card--xmas .cj-body::before, .cj-card--xmas .cj-body::after {
+  content: ''; position: absolute; left: 8px; right: 8px; height: 4px;
+  border-top: 2px solid #14100c; border-bottom: 1px solid #14100c; }
+.cj-card--xmas .cj-body::before { top: 4px; }
+.cj-card--xmas .cj-body::after { bottom: 0; }
+.cj-card--xmas .cj-top { font-family: Georgia, 'Noto Serif SC', serif; font-size: 8px;
+  font-weight: 700; letter-spacing: .22em; color: #14100c; }
+.cj-card--xmas .cj-big { margin-top: 5px; font-family: 'Lobster', cursive;
+  font-size: 17px; line-height: 1.05; color: #c8102e;
+  text-shadow: 1.4px 1.4px 0 #14603a, -.6px -.6px 0 #14603a; }
+.cj-card--xmas .cj-small { margin: 5px 0 6px; font-family: Georgia, serif;
+  font-style: italic; font-size: 8px; }
+.cj-card--xmas .cj-burst { background: #14603a; color: #f6f3ea; }
+
+/* --- Bazooka Joe. Newsprint, comic red over comic blue, fat halftone. */
+.cj-card--bazooka { --paper: #fdf0c4; --ink: #14213d; --accent: #e02020; --sub: #2f5fb0; }
+.cj-card--bazooka .cj-dots { opacity: .3;
+  background-image: radial-gradient(#e02020 1.4px, transparent 1.6px);
+  background-size: 7px 7px; }
+.cj-card--bazooka .cj-top { font-family: 'Comic Neue', cursive; font-weight: 700;
+  font-size: 11px; letter-spacing: .05em; color: #e02020;
+  text-shadow: 1px 1px 0 #14213d; }
+.cj-card--bazooka .cj-big { font-family: 'Anton', sans-serif; font-size: 13px;
+  color: #14213d; -webkit-text-stroke: .4px #fdf0c4; }
+.cj-card--bazooka .cj-small { font-family: 'Comic Neue', cursive; font-weight: 700;
+  font-size: 9px; color: #2f5fb0; }
+
+/* --- Enigma Co. Steel plate, stencil caps, a part number in mono. */
+.cj-card--enigma { --paper: #3a3f45; --ink: #e6eaed; --accent: #9aa4ad; --sub: #aeb6bd;
+  background: linear-gradient(160deg, #52585f 0%, #3a3f45 46%, #24272b 100%);
+  border-color: #14171a;
+  box-shadow: 4px 4px 0 rgba(0,0,0,.65), inset 0 1px 0 rgba(255,255,255,.16); }
+.cj-card--enigma .cj-dots { opacity: .1;
+  background-image: radial-gradient(#0b0d0f 1px, transparent 1.2px);
+  background-size: 4px 4px; }
+.cj-card--enigma .cj-top { font-family: 'Anton', sans-serif; font-size: 9px;
+  letter-spacing: .34em; color: #cfd6db; }
+.cj-card--enigma .cj-big { margin-top: 4px; font-family: 'Anton', sans-serif;
+  font-size: 12px; letter-spacing: .06em; color: #e6eaed;
+  text-shadow: 0 1px 0 #14171a; }
+.cj-card--enigma .cj-small { margin-top: 3px; font-family: 'Space Mono', monospace;
+  font-size: 8px; letter-spacing: .04em; color: #9aa4ad; }
+.cj-card--enigma .cj-burst { background: #8d1a1a; color: #e6eaed; }
+.cj-card--enigma .cj-close { color: #cfd6db; }
+
+/* --- 素数. Poster red, gold serif, the only skin that belongs to the room. */
+.cj-card--primes { --paper: #8a0a1c; --ink: #ffd100; --accent: #ffe873; --sub: #f4e4c1;
+  border-color: #ffd100; }
+.cj-card--primes .cj-dots { opacity: .12;
+  background-image: radial-gradient(#ffd100 1px, transparent 1.2px); }
+.cj-card--primes .cj-top { font-family: 'Noto Serif SC', serif; font-weight: 900;
+  font-size: 15px; color: #ffd100; }
+.cj-card--primes .cj-big { margin-top: 3px; font-family: 'Anton', sans-serif;
+  font-size: 12px; letter-spacing: .05em; color: #fff6dc; }
+.cj-card--primes .cj-small { font-family: 'Space Mono', monospace; font-size: 8px;
+  color: #f4e4c1; opacity: .75; }
+.cj-card--primes .cj-burst { background: #ffd100; color: #8a0a1c; }
+.cj-card--primes .cj-close { color: #ffd100; }
 
 /* Stage 3. The card stops sitting still. */
 .cj-card--rot { animation: cj-rot 2.4s ease-in-out infinite; }
@@ -902,6 +997,6 @@ summary, [role="button"] { cursor: pointer; }
   font-size: 34vh; pointer-events: none; }
 
 @media (prefers-reduced-motion: reduce) {
-  .cj-card--rot { animation: none !important; }
+  .cj-card--rot, .cj-card { animation: none !important; }
   .subliminal { display: none !important; }
 }
