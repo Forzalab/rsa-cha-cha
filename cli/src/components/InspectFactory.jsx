@@ -150,9 +150,12 @@ function Pipe({ digits, reversed = false, dead = false, heat = 0, flowKey = 0, c
   )
 }
 
-function Station({ n, tone, seal, onSeal, innerRef, footer, rail, editable = false, sealed = false, children }) {
+function Station({ n, tone, seal, onSeal, innerRef, footer, rail, editable = false, sealed = false, reject = 0, children }) {
+  // Two class names, one animation each. Re-adding a class React never removed
+  // does not restart a CSS animation, so consecutive rejections alternate.
+  const shake = reject === 1 ? 'station-reject-a' : reject === 2 ? 'station-reject-b' : ''
   return (
-    <div ref={innerRef} className={`station relative z-10 w-44 shrink-0 ${tone === 'danger' ? 'station-hit' : tone === 'hot' ? 'station-live' : ''} ${editable ? 'station-console' : ''} ${sealed ? 'station-glass' : ''}`}>
+    <div ref={innerRef} className={`station relative z-10 w-44 shrink-0 ${tone === 'danger' ? 'station-hit' : tone === 'hot' ? 'station-live' : ''} ${editable ? 'station-console' : ''} ${sealed ? 'station-glass' : ''} ${shake}`}>
       <div className="station-plate">
         <span className="rivet" style={{ left: 4, top: 4 }} /><span className="rivet" style={{ right: 4, top: 4 }} />
         <span className="rivet" style={{ left: 4, bottom: 4 }} /><span className="rivet" style={{ right: 4, bottom: 4 }} />
@@ -250,12 +253,15 @@ function useWpm() {
 // Past 20 the tag widens and the reels start turning. Nobody is told.
 const COUNTER_WAKE = 20
 
-function Counter({ value, hot, rage }) {
+function Counter({ value, idle, hot, rage }) {
   const woken = value >= COUNTER_WAKE
   const shown = String(Math.min(999, value))
   const digits = shown.padStart(3, '0').split('')
   const lead = shown.padStart(3, '0').search(/[1-9]/)
-  if (!woken) return <span className="counter counter-idle">1</span>
+  // The sleeping face is the station number. It was literal '1' back when the
+  // counter could only ever live on station 1; the moment it started moving
+  // between the two consoles, station 5 started calling itself 1.
+  if (!woken) return <span className="counter counter-idle">{idle}</span>
   return (
     <span className={`counter counter-woke ${hot ? 'counter-hot' : ''} ${rage ? 'counter-rage' : ''}`}>
       {digits.map((d, i) => (
@@ -275,19 +281,34 @@ function Counter({ value, hot, rage }) {
 // system to one box and made typing into station 5 look unscored. A bar
 // across the top belongs to the floor, not to a station -- so both consoles
 // feed the same one and nothing has to move when the direction flips.
+// No number on it. A gauge you cannot read is a gauge you keep watching, and
+// the only quantity that matters is whether it is still climbing.
+//
+// The track measures 0..100, so the second tick is the lip of the vessel
+// rather than a mark two thirds along. Past it the fill has nowhere to go and
+// stops obeying the housing -- it crawls out the right side, green, fuming.
 function GloryBar({ wpm, tier, ratchet }) {
-  const fill = Math.min(1, wpm / 130)
+  const fill = Math.min(1, wpm / TIERS[1])
+  const spill = Math.max(0, Math.min(1, (wpm - TIERS[1]) / (TIERS[2] - TIERS[1])))
   return (
     <div className={`glorybar glorybar-t${tier} ${ratchet ? 'glorybar-ratchet' : ''}`}>
-      <span className="glorybar-label">荣耀</span>
-      <div className="glorybar-track">
-        <div className="glorybar-fill" style={{ width: `${fill * 100}%` }} />
-        <span className="glorybar-notches" aria-hidden="true" />
-        {TIERS.map((t) => (
-          <span key={t} className={`glorybar-tick ${wpm >= t ? 'glorybar-tick-lit' : ''}`} style={{ left: `${(t / 130) * 100}%` }} />
-        ))}
+      <div className="glorybar-rig">
+        <div className="glorybar-track">
+          <div className="glorybar-fill" style={{ width: `${fill * 100}%` }} />
+          <span className="glorybar-notches" aria-hidden="true" />
+          <span className={`glorybar-tick ${wpm >= TIERS[0] ? 'glorybar-tick-lit' : ''}`}
+            style={{ left: `${(TIERS[0] / TIERS[1]) * 100}%` }} />
+        </div>
+        {spill > 0 && (
+          <span className="glorybar-spill" aria-hidden="true"
+            style={{ width: `${16 + spill * 104}px`, '--spill': spill }}>
+            <span className="glorybar-ooze" />
+            <span className="glorybar-fume" />
+            <span className="glorybar-fume" style={{ animationDelay: '.6s' }} />
+            <span className="glorybar-fume" style={{ animationDelay: '1.2s' }} />
+          </span>
+        )}
       </div>
-      <span className="glorybar-wpm">{Math.min(999, wpm)}<em>wpm</em></span>
     </div>
   )
 }
@@ -340,6 +361,8 @@ export function InspectFactory({ message, keypair, onClose, onRitual }) {
   // line is running. The key restarts the animation; it dies on its own.
   const [flowKey, setFlowKey] = useState(0)
   const [ratchet, setRatchet] = useState(false)
+  // { which, n } -- n alternates 1/2 so a held key keeps re-firing the shake.
+  const [reject, setReject] = useState(null)
 
   const { wpm, feed, reset: resetWpm } = useWpm()
   const coinsRef = useRef(null)
@@ -391,6 +414,12 @@ export function InspectFactory({ message, keypair, onClose, onRitual }) {
     const t = setTimeout(() => setPulse(0), 700)
     return () => clearTimeout(t)
   }, [pulse])
+
+  useEffect(() => {
+    if (!reject) return
+    const t = setTimeout(() => setReject(null), 380)
+    return () => clearTimeout(t)
+  }, [reject])
 
   const heat = Math.min(1, wpm / 130)
   const tier = wpm >= 130 ? 3 : wpm >= 100 ? 2 : wpm >= 60 ? 1 : 0
@@ -468,7 +497,11 @@ export function InspectFactory({ message, keypair, onClose, onRitual }) {
   // Both boxes feed the same counter, so the gauge, the coins, the eye and the
   // quake behave identically whichever end you are typing into.
   const typeInto = (which) => (event) => {
-    const value = event.target.value
+    const raw = event.target.value
+    // The modulus is the wall. Refuse the character and shake the plate --
+    // that lands harder than a meter creeping toward a number nobody reads.
+    const value = clipBytes(raw, limit)
+    if (value !== raw) setReject((r) => ({ which, n: r && r.n === 1 ? 2 : 1 }))
     if (which === 'back') { setDir('back'); setOut(value); setDraft(value) }
     else { setDir('fwd'); setDraft(value); setOut(value) }
     setFlowKey(Date.now())
@@ -476,10 +509,6 @@ export function InspectFactory({ message, keypair, onClose, onRitual }) {
     feed(value.length)
     if (heat > 0.4 && Math.random() < 0.15) burstCoin()
   }
-
-  const bytes = new TextEncoder().encode(source).length
-  const fuel = Math.min(1, bytes / limit)
-  const over = bytes > limit
 
   const fire = () => {
     const target = TARGETS[Math.floor(Math.random() * 3)]
@@ -521,14 +550,11 @@ export function InspectFactory({ message, keypair, onClose, onRitual }) {
         <div className="relative z-10 overflow-x-auto px-4 pb-12 pt-14">
           <div className="grid w-max" style={{ gridTemplateColumns: 'auto 4rem auto 4rem auto', gridTemplateRows: 'auto 7rem auto' }}>
 
-            <Station editable n={dir === 'fwd' ? <Counter value={wpm} hot={tier >= 1} rage={tier >= 2} /> : '1'} tone={dir === 'fwd' ? 'hot' : 'idle'}
+            <Station editable reject={reject?.which === 'fwd' ? reject.n : 0} n={dir === 'fwd' ? <Counter value={wpm} idle="1" hot={tier >= 1} rage={tier >= 2} /> : '1'} tone={dir === 'fwd' ? 'hot' : 'idle'}
               footer={<DeskLamp lit={!!pulse} />}
               rail={tip ? <span className="tip-bubble">{draft.length === 0 ? FIRST_LINE : tooltipLine()}</span> : null}>
               <textarea value={source} rows={3} onChange={typeInto('fwd')}
                 className="w-full resize-none bg-transparent font-mono text-[11px] text-white caret-[#ffd100] outline-none" />
-              <div className="mt-1 h-1.5 w-full bg-black/50">
-                <div className={`h-full transition-all ${over ? 'bg-[#ff2d78]' : fuel < 0.75 ? 'bg-[#2dd4bf]' : 'bg-[#ffd100]'}`} style={{ width: `${fuel * 100}%` }} />
-              </div>
             </Station>
             <Pipe digits={bits(line.m, 6)} heat={heat} flowKey={flowKey} dead={pipeDead(1, 2)} reversed={dir === 'back'} />
             <Station n="2" sealed tone={toneOf(2)} innerRef={refs.pack} seal={!broken(2)} onSeal={() => setSealAt(sealAt === 2 ? null : 2)}>
@@ -542,7 +568,7 @@ export function InspectFactory({ message, keypair, onClose, onRitual }) {
             <div className="col-span-4 grid translate-y-2 place-items-center" ref={starRef}><RayStar armed={!!ray} onFire={fire} eye={tier >= 2 ? Math.min(1, (wpm - 100) / 30 + 0.35) : 0} gaze={gaze} /></div>
             <div className="grid place-items-center"><Pipe digits={bits(line.wire, 4)} heat={heat} flowKey={flowKey} reversed={dir === 'back'} dead={pipeDead(3, 4)} className="pipe-v" /></div>
 
-            <Station editable n={dir === 'back' ? <Counter value={wpm} hot={tier >= 1} rage={tier >= 2} /> : '5'} tone={dir === 'back' && !broken(5) ? 'hot' : toneOf(5)} seal={line.sigOk} onSeal={() => setSealAt(sealAt === 5 ? null : 5)}
+            <Station editable reject={reject?.which === 'back' ? reject.n : 0} n={dir === 'back' ? <Counter value={wpm} idle="5" hot={tier >= 1} rage={tier >= 2} /> : '5'} tone={dir === 'back' && !broken(5) ? 'hot' : toneOf(5)} seal={line.sigOk} onSeal={() => setSealAt(sealAt === 5 ? null : 5)}
               footer={<DeskLamp lit={!!pulse} />}>
               <textarea rows={3} onChange={typeInto('back')}
                 value={dir === 'back' ? out : (line.recovered || '')}

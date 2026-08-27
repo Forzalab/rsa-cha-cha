@@ -650,6 +650,13 @@ summary, [role="button"] { cursor: pointer; }
 }
 .pipe-rev .pipe-fluid { animation-direction: reverse; }
 @keyframes fluid-run { to { background-position: 16px 0; } }
+/* The riser inherited a 90deg gradient scrolling on X, so its bands ran
+   across the pipe instead of along it. Same stripe, rotated with the housing;
+   .pipe-rev still flips the direction because it only touches the axis sign. */
+.pipe-v .pipe-fluid { inset: 0;
+  background: repeating-linear-gradient(180deg, transparent 0 14px, rgba(255,209,0,.14) 14px 16px);
+  animation-name: fluid-run-v; }
+@keyframes fluid-run-v { to { background-position: 0 16px; } }
 .pipe-bit {
   position: absolute; left: -8%; transform: none; rotate: none; writing-mode: horizontal-tb;
   font-family: 'Space Mono', monospace; font-size: 11px; font-weight: 700;
@@ -684,6 +691,8 @@ summary, [role="button"] { cursor: pointer; }
 }
 .pipe-dead .pipe-fluid { animation-play-state: paused; filter: none;
   background: repeating-linear-gradient(90deg, transparent 0 14px, rgba(255,45,120,.24) 14px 16px); }
+.pipe-dead.pipe-v .pipe-fluid {
+  background: repeating-linear-gradient(180deg, transparent 0 14px, rgba(255,45,120,.24) 14px 16px); }
 .pipe-dead .pipe-bit { animation-play-state: paused; color: #ff5c92;
   text-shadow: 0 0 9px rgba(255,45,120,.95), 0 0 14px rgba(0,0,0,.9); }
 
@@ -751,6 +760,21 @@ summary, [role="button"] { cursor: pointer; }
   60%  { opacity: .7 }
   100% { transform: translateY(-48px) scale(calc(2.9 * var(--puff))); opacity: 0 }
 }
+/* The modulus wall. Two names, one motion -- alternating them is what makes
+   a held key shake every time instead of once. */
+.station-reject-a .station-plate { animation: reject-a .36s cubic-bezier(.36,.07,.19,.97); }
+.station-reject-b .station-plate { animation: reject-b .36s cubic-bezier(.36,.07,.19,.97); }
+.station-reject-a .station-plate,
+.station-reject-b .station-plate { border-color: #ff2d78; }
+@keyframes reject-a {
+  10%,90% { transform: translateX(-2px) } 20%,80% { transform: translateX(4px) }
+  30%,50%,70% { transform: translateX(-7px) } 40%,60% { transform: translateX(7px) }
+}
+@keyframes reject-b {
+  10%,90% { transform: translateX(-2px) } 20%,80% { transform: translateX(4px) }
+  30%,50%,70% { transform: translateX(-7px) } 40%,60% { transform: translateX(7px) }
+}
+
 .seal-panic { animation: seal-panic .34s ease-in-out infinite; }
 @keyframes seal-panic {
   0%,100% { transform: translateX(0) rotate(0) } 25% { transform: translateX(-2px) rotate(-8deg) }
@@ -807,10 +831,10 @@ summary, [role="button"] { cursor: pointer; }
   100% { transform: translate(1px, -1px) }
 }
 
-.glorybar { position: relative; z-index: 10; display: flex; align-items: center; gap: 8px;
-  margin: -4px 0 10px; }
-.glorybar-label { font-family: 'Noto Serif SC', serif; font-weight: 900; font-size: 11px;
-  letter-spacing: .12em; color: #ffd100; opacity: .75; }
+.glorybar { position: relative; z-index: 10; display: flex; justify-content: center;
+  margin: -2px 0 14px; }
+.glorybar-rig { position: relative; display: flex; align-items: center;
+  width: min(360px, 64%); }
 .glorybar-track { position: relative; flex: 1; height: 11px; overflow: hidden;
   border: 1px solid rgba(255,209,0,.35); background: rgba(0,0,0,.62);
   box-shadow: inset 0 2px 5px rgba(0,0,0,.85); }
@@ -820,19 +844,37 @@ summary, [role="button"] { cursor: pointer; }
   transition: width .12s linear, background .3s; }
 .glorybar-notches { position: absolute; inset: 0; pointer-events: none;
   background: repeating-linear-gradient(90deg, transparent 0 7px, rgba(0,0,0,.5) 7px 9px); }
-.glorybar-tick { position: absolute; top: -1px; bottom: -1px; width: 2px;
-  background: #7a5f24; }
+.glorybar-tick { position: absolute; top: -1px; bottom: -1px; width: 2px; background: #7a5f24; }
 .glorybar-tick-lit { background: #fff6dc; box-shadow: 0 0 7px rgba(255,246,220,.95); }
-.glorybar-wpm { min-width: 52px; text-align: right;
-  font-family: 'Space Mono', monospace; font-size: 12px; font-weight: 700; color: #ffd100; }
-.glorybar-wpm em { margin-left: 2px; font-style: normal; font-size: 8px; opacity: .55; }
 .glorybar-t2 .glorybar-fill { background: linear-gradient(90deg, #ffd100, #ff8a3d 70%, #ffe873); }
-.glorybar-t3 .glorybar-fill { background: linear-gradient(90deg, #ff8a3d, #ff2d78 60%, #ffe873);
-  box-shadow: 0 0 16px rgba(255,45,120,.8); }
-.glorybar-t3 .glorybar-track { border-color: #ff2d78; }
+.glorybar-t3 .glorybar-fill { background: linear-gradient(90deg, #ff8a3d, #b4ff78 60%, #39ff14); }
+.glorybar-t2 .glorybar-track,
+.glorybar-t3 .glorybar-track { border-color: #b4ff78; box-shadow: inset 0 2px 5px rgba(0,0,0,.85), 0 0 12px rgba(120,255,90,.45); }
 .glorybar-ratchet { animation: glorybar-ratchet .4s cubic-bezier(.3,1.6,.4,1); }
 @keyframes glorybar-ratchet {
   0% { transform: scaleY(1) } 45% { transform: scaleY(1.9) } 100% { transform: scaleY(1) }
+}
+
+/* Past the second tick the vessel is full and the fill stops respecting it.
+   The spill is a sibling of the track, so overflow:hidden never sees it. */
+.glorybar-spill { position: relative; height: 11px; margin-left: -1px; flex: none;
+  filter: drop-shadow(0 0 calc(6px + var(--spill) * 12px) rgba(120,255,90,.9)); }
+.glorybar-ooze { position: absolute; inset: 0;
+  background: linear-gradient(90deg, #ffe873 0%, #b4ff78 30%, #39ff14 68%, rgba(57,255,20,0) 100%);
+  clip-path: polygon(0 0, 88% 14%, 100% 50%, 88% 86%, 0 100%);
+  animation: ooze-crawl 1.1s ease-in-out infinite alternate; }
+@keyframes ooze-crawl {
+  0%   { transform: scaleY(1);   filter: brightness(1) }
+  100% { transform: scaleY(1.6); filter: brightness(1.35) }
+}
+.glorybar-fume { position: absolute; top: -1px; right: 10%; width: 13px; height: 13px;
+  border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle at 44% 44%, rgba(214,255,190,.95), rgba(120,255,90,.4) 55%, rgba(57,255,20,0) 78%);
+  filter: blur(3px); animation: fume-rise 1.9s ease-out infinite; }
+@keyframes fume-rise {
+  0%   { transform: translate(0, 3px) scale(.35); opacity: 0 }
+  14%  { opacity: .95 }
+  100% { transform: translate(-16px, -38px) scale(2.8); opacity: 0 }
 }
 
 .gauge { position: absolute; right: -13px; top: 6px; bottom: 6px; width: 8px;
@@ -882,7 +924,8 @@ summary, [role="button"] { cursor: pointer; }
 
 @media (prefers-reduced-motion: reduce) {
   .counter-rage, .gauge-ratchet, .coin, .panel-quake, .tip-bubble, .counter-woke,
-  .glorybar-ratchet { animation: none !important; }
+  .glorybar-ratchet, .glorybar-ooze, .glorybar-fume,
+  .station-reject-a .station-plate, .station-reject-b .station-plate { animation: none !important; }
   .panel-quake { transform: none !important; }
 }
 
