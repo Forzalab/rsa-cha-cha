@@ -144,7 +144,6 @@ function CopyBit({ label, value, beg = false }) {
   return (
     <button type="button" onClick={copy} title={`Copy ${value}`} aria-label={`Copy ${value}`}
       className={`copybit ${begging ? 'copybit-beg' : ''}`}>
-      {begging && <span className="copybit-ghost" aria-hidden="true">copy</span>}
       <span>{label}</span>
       <svg viewBox="0 0 14 14" className="copybit-mark" aria-hidden="true">
         {done
@@ -154,6 +153,44 @@ function CopyBit({ label, value, beg = false }) {
               <path d="M9.1 2.6H2.5v6.6" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
             </>}
       </svg>
+    </button>
+  )
+}
+
+// The panel already shows the arithmetic. What it cannot show is that the
+// numbers are honest, so the two things a stranger needs to redo it live
+// right next to the claim.
+function CopyKey({ name, value }) {
+  const [done, setDone] = useState(false)
+  const copy = (event) => {
+    event.stopPropagation()
+    try {
+      if (navigator.clipboard?.writeText) navigator.clipboard.writeText(value)
+      else throw new Error('no clipboard api')
+    } catch {
+      const pad = document.createElement('textarea')
+      pad.value = value
+      pad.setAttribute('readonly', '')
+      pad.style.cssText = 'position:fixed;top:0;left:0;opacity:0'
+      document.body.appendChild(pad)
+      pad.select()
+      try { document.execCommand('copy') } catch { /* nothing left to try */ }
+      pad.remove()
+    }
+    setDone(true)
+    setTimeout(() => setDone(false), 1100)
+  }
+  return (
+    <button type="button" onClick={copy} className="copykey" aria-label={`Copy ${name}`}>
+      <svg viewBox="0 0 14 14" className="copykey-mark" aria-hidden="true">
+        {done
+          ? <path d="M2.6 7.4l3 3 5.8-6.4" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
+          : <>
+              <rect x="4.9" y="4.9" width="6.6" height="6.6" fill="none" stroke="currentColor" strokeWidth="1.3" />
+              <path d="M9.1 2.6H2.5v6.6" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+            </>}
+      </svg>
+      {done ? 'copied' : `copy ${name}`}
     </button>
   )
 }
@@ -374,7 +411,7 @@ function MatrixField({ seed, heat = 0 }) {
   return (
     <div className="matrix-field pointer-events-none absolute inset-0 z-0 overflow-hidden">
       {cols.map((c, i) => (
-        <span key={i} className="matrix-col" style={{ left: c.left, animationDelay: c.delay, animationDuration: c.dur, opacity: 0.018 + veil * 0.2, color: `rgb(${Math.round(96 + veil * 159)},${Math.round(76 + veil * 156)},${Math.round(26 + veil * 89)})` }}>{c.text}</span>
+        <span key={i} className="matrix-col" style={{ left: c.left, animationDelay: c.delay, animationDuration: c.dur, opacity: 0.009 + veil * 0.13, color: `rgb(${Math.round(96 + veil * 159)},${Math.round(76 + veil * 156)},${Math.round(26 + veil * 89)})` }}>{c.text}</span>
       ))}
     </div>
   )
@@ -741,6 +778,12 @@ export function InspectFactory({ message, keypair, onClose, onRitual }) {
           <div className="relative z-20 mt-3 w-fit border-2 border-[#ffd100]/60 bg-[#12010a] p-2.5 font-mono text-[10px] leading-5 text-[#fff6dc]/85 shadow-[6px_6px_0_rgba(0,0,0,.5)]">
             <p className="break-all">m<sup>D</sup> mod N · <Digits value={line.sig} rogueAt={ray && ray.target !== 'pack' ? Math.min(ray.at, line.sig.length - 1) : null} /></p>
             <p>s<sup>E</sup> mod N · <span className={line.sigOk ? 'text-[#2dd4bf]' : 'text-[#ff2d78]'}>{line.sigOk ? `"${line.attested}"` : '□□□'}</span></p>
+            <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-[#ffd100]/20 pt-2">
+              <span className="text-[#ffd100]">Don't trust me. Copy and verify.</span>
+              <CopyKey name="E" value={E.toString()} />
+              <CopyKey name="N" value={N.toString()} />
+              <CopyKey name="S" value={line.sig} />
+            </div>
           </div>
         )}
 
