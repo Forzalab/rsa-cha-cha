@@ -106,13 +106,22 @@ export function AdStack() {
   // div inherits the sidebar's true content width for free. Measure it, pin
   // the fixed layer to that rectangle. No guessing, no viewport clamps.
   const anchorRef = useRef(null)
+  // .chat-shell carries backdrop-blur-xl. A backdrop-filter ancestor becomes
+  // the containing block for every fixed descendant, so `left` resolves
+  // against that section, not the viewport -- while the anchor rect is in
+  // viewport coords. Two origins, one number. .chat-shell is mx-auto, so the
+  // error is half the leftover width. This probe reads where `left: 0`
+  // actually lands, so the math is right with or without the blur.
+  const originRef = useRef(null)
   const [band, setBand] = useState(null)
   useEffect(() => {
     const el = anchorRef.current
     if (!el) return
     const measure = () => {
       const r = el.getBoundingClientRect()
-      setBand(r.width > 40 ? { left: r.left, width: r.width } : null)
+      if (r.width <= 40) { setBand(null); return }
+      const originX = originRef.current?.getBoundingClientRect().left ?? 0
+      setBand({ left: r.left - originX, width: r.width })
     }
     measure()
     const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null
@@ -198,8 +207,12 @@ export function AdStack() {
   return (
     <>
       <div ref={anchorRef} aria-hidden="true" className="h-0 w-full" />
+      <span ref={originRef} aria-hidden="true" className="ad-origin" />
       <div className="ad-swarm" aria-label="advertisements"
-        style={band ? { left: `${band.left - 8}px`, '--ad-w': `${band.width}px` } : undefined}>
+        style={band ? {
+          left: `${band.left}px`, right: 'auto', width: `${band.width}px`,
+          padding: 0, '--ad-w': `${band.width}px`,
+        } : undefined}>
         {cards.map((card) => (
           <AdCard key={card.id} seed={card.id} stage={stage} onDismiss={() => dismiss(card.id)} />
         ))}
