@@ -868,6 +868,13 @@ summary, [role="button"] { cursor: pointer; }
    below only run when the sidebar is display:none. Columns overflow to the
    RIGHT, over the chat -- the sidebar is the left edge, so that is the only
    direction the fourth wall can break. */
+/* Zero-size probe. Shares .ad-swarm's containing block and is pinned to its
+   origin, so its client rect reports where `left: 0` actually lands. */
+.ad-origin {
+  position: fixed; left: 0; top: 0;
+  width: 0; height: 0;
+  pointer-events: none;
+}
 .ad-swarm {
   --ad-w: min(340px, 82vw);
   position: fixed;
@@ -993,8 +1000,7 @@ summary, [role="button"] { cursor: pointer; }
 .cj-card--enigma .cj-close { color: #cfd6db; }
 
 /* --- 素数. Poster red, gold serif, the only skin that belongs to the room. */
-.cj-card--primes { --paper: #8a0a1c; --ink: #ffd100; --accent: #ffe873; --sub: #f4e4c1;
-  border-color: rgba(255,209,0,.35); }
+.cj-card--primes { --paper: #8a0a1c; --ink: #ffd100; --accent: #ffe873; --sub: #f4e4c1; }
 .cj-card--primes .cj-dots { opacity: .12;
   background-image: radial-gradient(#ffd100 1px, transparent 1.2px); }
 .cj-card--primes .cj-top { font-family: 'Noto Serif SC', serif; font-weight: 900;
