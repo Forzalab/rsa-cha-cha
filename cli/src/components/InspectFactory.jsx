@@ -158,13 +158,15 @@ function Station({ n, tone, seal, onSeal, innerRef, footer, rail, editable = fal
         <span className="rivet" style={{ left: 4, bottom: 4 }} /><span className="rivet" style={{ right: 4, bottom: 4 }} />
         <div className="flex items-center gap-1.5 border-b border-[#ffd100]/25 px-2 py-1">
           <span className="grid min-h-5 min-w-5 place-items-center border border-[#ffd100]/60 bg-[#ffd100]/10 px-1 font-mono text-[11px] font-black text-[#ffd100]">{n}</span>
-          {editable && <span className="ml-auto text-[11px]">✏️</span>}
-          {seal != null && (
-            <button type="button" onClick={onSeal} aria-label="signature"
-              className={`ml-auto grid h-5 w-5 place-items-center rounded-full border font-mono text-[9px] font-black ${seal ? 'border-[#2dd4bf] bg-[#2dd4bf]/15 text-[#2dd4bf]' : 'seal-panic border-[#ff2d78] bg-[#ff2d78]/20 text-[#ff2d78]'}`}>
-              {seal ? <MarkOk /> : <MarkBad />}
-            </button>
-          )}
+          <span className="ml-auto flex items-center gap-1.5">
+            {editable && <span className="station-edit-tag">edit</span>}
+            {seal != null && (
+              <button type="button" onClick={onSeal} aria-label="signature"
+                className={`grid h-5 w-5 place-items-center rounded-full border font-mono text-[9px] font-black ${seal ? 'border-[#2dd4bf] bg-[#2dd4bf]/15 text-[#2dd4bf]' : 'seal-panic border-[#ff2d78] bg-[#ff2d78]/20 text-[#ff2d78]'}`}>
+                {seal ? <MarkOk /> : <MarkBad />}
+              </button>
+            )}
+          </span>
         </div>
         <div className="h-20 overflow-y-auto break-all p-2 font-mono text-[10px] leading-4 text-[#fff6dc]/85">
           {sealed && <span className="glass-cover" aria-hidden="true" />}
@@ -174,21 +176,19 @@ function Station({ n, tone, seal, onSeal, innerRef, footer, rail, editable = fal
       {rail}
       {footer}
       {tone === 'danger' && <>
-        <span className="smoke" style={{ left: '20%' }} />
-        <span className="smoke" style={{ left: '48%', animationDelay: '.55s' }} />
-        <span className="smoke" style={{ left: '74%', animationDelay: '1.15s' }} />
+        <span className="smoke" style={{ left: '14%', animationDelay: '0s',    '--puff': 1.25 }} />
+        <span className="smoke" style={{ left: '33%', animationDelay: '.42s',  '--puff': .85 }} />
+        <span className="smoke" style={{ left: '50%', animationDelay: '.86s',  '--puff': 1.45 }} />
+        <span className="smoke" style={{ left: '68%', animationDelay: '1.28s', '--puff': .95 }} />
+        <span className="smoke" style={{ left: '85%', animationDelay: '1.7s',  '--puff': 1.15 }} />
       </>}
     </div>
   )
 }
 
 function RayStar({ armed, onFire, eye = 0, gaze = { x: 0, y: 0 } }) {
-  const [tip, setTip] = useState(false)
-  // A keystroke sends one chevron train down every pipe in the direction the
-  // line is running. The key restarts the animation; it dies on its own.
-  const [flowKey, setFlowKey] = useState(0)
   return (
-    <button type="button" onClick={onFire} onMouseEnter={() => setTip(true)} onMouseLeave={() => setTip(false)}
+    <button type="button" onClick={onFire}
       aria-label="cosmic ray" className="ray-star relative z-20 grid h-16 w-16 place-items-center bg-transparent">
       <svg viewBox="0 0 64 64" className={`absolute inset-0 star-outer ${armed ? 'star-armed' : ''}`}>
         <polygon points="32,3 39,22 60,22 43,35 49,56 32,44 15,56 21,35 4,22 25,22" fill="none" stroke="#ffd100" strokeWidth="2.5" />
@@ -204,7 +204,6 @@ function RayStar({ armed, onFire, eye = 0, gaze = { x: 0, y: 0 } }) {
           <path d="M19 32a13 8 0 0 0 26 0" fill="none" stroke="#7a5f24" strokeWidth="1.4" />
         </svg>
       )}
-      {tip && <span className="pointer-events-none absolute -top-6 left-1/2 -translate-x-1/2 border border-[#ffd100]/60 bg-[#12010a] px-1.5 font-mono text-[9px] text-[#ffd100]">zap</span>}
     </button>
   )
 }
@@ -271,19 +270,35 @@ function Counter({ value, hot, rage }) {
 }
 
 // Fills as you type, drains the moment you slow. The drain is the point.
-function GloryGauge({ wpm, ratchet }) {
+//
+// It used to be an 8px rail bolted to station 1, which tied the whole glory
+// system to one box and made typing into station 5 look unscored. A bar
+// across the top belongs to the floor, not to a station -- so both consoles
+// feed the same one and nothing has to move when the direction flips.
+function GloryBar({ wpm, tier, ratchet }) {
   const fill = Math.min(1, wpm / 130)
   return (
-    <div className={`gauge ${ratchet ? 'gauge-ratchet' : ''}`}>
-      <div className="gauge-fill" style={{ height: `${fill * 100}%` }} />
-      {TIERS.map((t) => (
-        <span key={t} className={`gauge-tick ${wpm >= t ? 'gauge-tick-lit' : ''}`} style={{ bottom: `${(t / 130) * 100}%` }} />
-      ))}
+    <div className={`glorybar glorybar-t${tier} ${ratchet ? 'glorybar-ratchet' : ''}`}>
+      <span className="glorybar-label">荣耀</span>
+      <div className="glorybar-track">
+        <div className="glorybar-fill" style={{ width: `${fill * 100}%` }} />
+        <span className="glorybar-notches" aria-hidden="true" />
+        {TIERS.map((t) => (
+          <span key={t} className={`glorybar-tick ${wpm >= t ? 'glorybar-tick-lit' : ''}`} style={{ left: `${(t / 130) * 100}%` }} />
+        ))}
+      </div>
+      <span className="glorybar-wpm">{Math.min(999, wpm)}<em>wpm</em></span>
     </div>
   )
 }
 
+// Below 100 wpm the field is a texture you are not meant to read. The veil
+// only opens across the last tick, so the boxes stay the loudest thing on
+// screen until the room has already been earned.
+const VEIL_FLOOR = 100 / 130
+
 function MatrixField({ seed, heat = 0 }) {
+  const veil = Math.max(0, (heat - VEIL_FLOOR) / (1 - VEIL_FLOOR))
   // A cipher of "0" is six characters after repeat, so every column past the
   // first came back empty. Pad the seed before slicing.
   const base = String(seed || '0') + '0173925486'
@@ -297,7 +312,7 @@ function MatrixField({ seed, heat = 0 }) {
   return (
     <div className="matrix-field pointer-events-none absolute inset-0 z-0 overflow-hidden">
       {cols.map((c, i) => (
-        <span key={i} className="matrix-col" style={{ left: c.left, animationDelay: c.delay, animationDuration: c.dur, opacity: 0.055 + heat * 0.17, color: `rgb(${Math.round(150 + heat * 105)},${Math.round(118 + heat * 114)},${Math.round(40 + heat * 75)})` }}>{c.text}</span>
+        <span key={i} className="matrix-col" style={{ left: c.left, animationDelay: c.delay, animationDuration: c.dur, opacity: 0.018 + veil * 0.2, color: `rgb(${Math.round(96 + veil * 159)},${Math.round(76 + veil * 156)},${Math.round(26 + veil * 89)})` }}>{c.text}</span>
       ))}
     </div>
   )
@@ -365,6 +380,10 @@ export function InspectFactory({ message, keypair, onClose, onRitual }) {
     ? ray != null && stage <= hitStage
     : stage >= hitStage)
   const toneOf = (stage) => (broken(stage) ? 'danger' : 'idle')
+  // A pipe carries whatever the station behind it produced. Kill it only when
+  // that feeder is broken -- a hit on station 3 does not poison 2 -> 3, which
+  // is still delivering clean digits into the wreck. Upstream flips with dir.
+  const pipeDead = (lo, hi) => broken(dir === 'back' ? hi : lo)
   const rogueOf = (t, v) => (ray?.target === t ? Math.min(ray.at, String(v).length - 1) : null)
 
   useEffect(() => {
@@ -497,38 +516,40 @@ export function InspectFactory({ message, keypair, onClose, onRitual }) {
           <button type="button" onClick={onClose} aria-label="close" className="ml-auto grid h-7 w-7 place-items-center border-2 border-[#ffd100]/60 font-mono text-[#ffd100] hover:bg-[#ffd100] hover:text-[#4a0410]">×</button>
         </div>
 
-        <div className="relative z-10 overflow-x-auto">
+        <GloryBar wpm={wpm} tier={tier} ratchet={ratchet} />
+
+        <div className="relative z-10 overflow-x-auto px-4 pb-12 pt-14">
           <div className="grid w-max" style={{ gridTemplateColumns: 'auto 4rem auto 4rem auto', gridTemplateRows: 'auto 7rem auto' }}>
 
-            <Station editable n={<Counter value={wpm} hot={tier >= 1} rage={tier >= 2} />} tone={dir === 'fwd' ? 'hot' : 'idle'}
+            <Station editable n={dir === 'fwd' ? <Counter value={wpm} hot={tier >= 1} rage={tier >= 2} /> : '1'} tone={dir === 'fwd' ? 'hot' : 'idle'}
               footer={<DeskLamp lit={!!pulse} />}
-              rail={<><GloryGauge wpm={wpm} ratchet={ratchet} />{tip && <span className="tip-bubble">{draft.length === 0 ? FIRST_LINE : tooltipLine()}</span>}</>}>
+              rail={tip ? <span className="tip-bubble">{draft.length === 0 ? FIRST_LINE : tooltipLine()}</span> : null}>
               <textarea value={source} rows={3} onChange={typeInto('fwd')}
                 className="w-full resize-none bg-transparent font-mono text-[11px] text-white caret-[#ffd100] outline-none" />
               <div className="mt-1 h-1.5 w-full bg-black/50">
                 <div className={`h-full transition-all ${over ? 'bg-[#ff2d78]' : fuel < 0.75 ? 'bg-[#2dd4bf]' : 'bg-[#ffd100]'}`} style={{ width: `${fuel * 100}%` }} />
               </div>
             </Station>
-            <Pipe digits={bits(line.m, 6)} heat={heat} flowKey={flowKey} dead={broken(2)} reversed={dir === 'back'} />
+            <Pipe digits={bits(line.m, 6)} heat={heat} flowKey={flowKey} dead={pipeDead(1, 2)} reversed={dir === 'back'} />
             <Station n="2" sealed tone={toneOf(2)} innerRef={refs.pack} seal={!broken(2)} onSeal={() => setSealAt(sealAt === 2 ? null : 2)}>
               <Digits value={line.m} rogueAt={rogueOf('pack', line.m)} />
             </Station>
-            <Pipe digits={bits(line.cipher, 6)} heat={heat} flowKey={flowKey} dead={broken(3)} reversed={dir === 'back'} />
+            <Pipe digits={bits(line.cipher, 6)} heat={heat} flowKey={flowKey} dead={pipeDead(2, 3)} reversed={dir === 'back'} />
             <Station n="3" sealed tone={toneOf(3)} innerRef={refs.lock} seal={!broken(3)} onSeal={() => setSealAt(sealAt === 3 ? null : 3)}>
               <Digits value={line.cipher} rogueAt={rogueOf('lock', line.cipher)} />
             </Station>
 
             <div className="col-span-4 grid translate-y-2 place-items-center" ref={starRef}><RayStar armed={!!ray} onFire={fire} eye={tier >= 2 ? Math.min(1, (wpm - 100) / 30 + 0.35) : 0} gaze={gaze} /></div>
-            <div className="grid place-items-center"><Pipe digits={bits(line.wire, 4)} heat={heat} flowKey={flowKey} reversed={dir === 'fwd'} dead={broken(4)} className="pipe-v" /></div>
+            <div className="grid place-items-center"><Pipe digits={bits(line.wire, 4)} heat={heat} flowKey={flowKey} reversed={dir === 'back'} dead={pipeDead(3, 4)} className="pipe-v" /></div>
 
-            <Station editable n="5" tone={dir === 'back' && !broken(5) ? 'hot' : toneOf(5)} seal={line.sigOk} onSeal={() => setSealAt(sealAt === 5 ? null : 5)}
+            <Station editable n={dir === 'back' ? <Counter value={wpm} hot={tier >= 1} rage={tier >= 2} /> : '5'} tone={dir === 'back' && !broken(5) ? 'hot' : toneOf(5)} seal={line.sigOk} onSeal={() => setSealAt(sealAt === 5 ? null : 5)}
               footer={<DeskLamp lit={!!pulse} />}>
               <textarea rows={3} onChange={typeInto('back')}
                 value={dir === 'back' ? out : (line.recovered || '')}
                 placeholder="□□□"
                 className={`w-full resize-none bg-transparent font-mono text-[11px] caret-[#ffd100] outline-none placeholder:text-[#fff6dc]/30 ${line.ok ? 'text-white' : 'text-[#ff2d78]'}`} />
             </Station>
-            <Pipe digits={bits(line.wire, 10)} heat={heat} flowKey={flowKey} reversed={dir === 'fwd'} dead={broken(5)} className="col-span-3" />
+            <Pipe digits={bits(line.wire, 10)} heat={heat} flowKey={flowKey} reversed={dir === 'fwd'} dead={pipeDead(4, 5)} className="col-span-3" />
             <Station n="4" sealed tone={toneOf(4)} innerRef={refs.wire} seal={!broken(4)} onSeal={() => setSealAt(sealAt === 4 ? null : 4)}>
               <Digits value={line.wire} rogueAt={rogueOf('wire', line.wire)} />
             </Station>
