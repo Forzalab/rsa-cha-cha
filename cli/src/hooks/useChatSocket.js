@@ -33,7 +33,9 @@ export function useChatSocket(url = import.meta.env.VITE_WS_URL || DEFAULT_URL) 
   const [kerneyThinking, setKerneyThinking] = useState(false)
   // Latest ritual event, local or remote. App drains it and clears it.
   const [ritualEvent, setRitualEvent] = useState(null)
-  const lastRitualAtRef = useRef(0)
+  // Cooldown is per tier. Ramping 0 -> 130 crosses 100 first, and a shared
+  // clock would let the announcement eat the takeover that follows it.
+  const lastRitualAtRef = useRef({})
 
   const applyReaction = useCallback((messageId, emoji, sender, action = 'ADD') => {
     setMessages((current) => current.map((message) => {
@@ -200,8 +202,8 @@ export function useChatSocket(url = import.meta.env.VITE_WS_URL || DEFAULT_URL) 
     const socket = socketRef.current
     if (!socket || socket.readyState !== WebSocket.OPEN || !username) return false
     const now = Date.now()
-    if (now - lastRitualAtRef.current < RITUAL_COOLDOWN_MS) return false
-    lastRitualAtRef.current = now
+    if (now - (lastRitualAtRef.current[tier] ?? 0) < RITUAL_COOLDOWN_MS) return false
+    lastRitualAtRef.current[tier] = now
 
     const eventId = newId()
     for (const recipient of members.filter((member) => member !== username)) {
