@@ -1295,15 +1295,26 @@ summary, [role="button"] { cursor: pointer; }
 
 /* ------------------------------------------------------------- copy me
    Loud until obeyed once, then silent forever. */
+/* The word is gone, so the mark has to carry the whole hint by itself --
+   bigger swing, brighter burn. */
 .copybit-beg .copybit-mark { opacity: 1; color: #ffd100;
-  animation: copy-beg 1.6s ease-in-out infinite; }
-.copybit-ghost { font-family: 'Space Mono', monospace; font-size: 9px;
-  letter-spacing: .12em; text-transform: uppercase; color: #ffd100;
-  animation: copy-beg 1.6s ease-in-out infinite; }
+  animation: copy-beg 1.35s ease-in-out infinite; }
 @keyframes copy-beg {
-  0%, 100% { opacity: .35; transform: scale(1); filter: drop-shadow(0 0 0 rgba(255,209,0,0)); }
-  50%      { opacity: 1;   transform: scale(1.22); filter: drop-shadow(0 0 7px rgba(255,209,0,.95)); }
+  0%, 100% { opacity: .55; transform: scale(1);
+             filter: drop-shadow(0 0 2px rgba(255,209,0,.5)); }
+  50%      { opacity: 1;   transform: scale(1.45);
+             filter: drop-shadow(0 0 11px rgba(255,209,0,1))
+                     drop-shadow(0 0 20px rgba(255,140,0,.75)); }
 }
+
+/* The attestation panel's own controls. Labelled, because a bare glyph next
+   to a wall of digits does not read as "take this with you". */
+.copykey { display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 7px; border: 1px solid rgba(255,209,0,.55); background: rgba(255,209,0,.07);
+  font-family: 'Space Mono', monospace; font-size: 10px; letter-spacing: .06em;
+  color: #ffd100; cursor: pointer; transition: background .14s, color .14s; }
+.copykey:hover, .copykey:focus-visible { background: #ffd100; color: #4a0410; }
+.copykey-mark { width: 11px; height: 11px; flex: none; }
 @media (prefers-reduced-motion: reduce) {
-  .copybit-beg .copybit-mark, .copybit-ghost { animation: none !important; opacity: 1; }
+  .copybit-beg .copybit-mark { animation: none !important; opacity: 1; }
 }
