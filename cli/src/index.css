@@ -1269,3 +1269,23 @@ summary, [role="button"] { cursor: pointer; }
 @media (prefers-reduced-motion: reduce) {
   .bridge-wait { animation: none !important; opacity: .8; }
 }
+
+/* ------------------------------------------------------- switched-off stages
+   Not damaged. Not running. Nothing is feeding them, and the eye should read
+   that as different from the red burning state. */
+.station-off { opacity: .38; filter: grayscale(1) brightness(.8); }
+.station-off .station-plate { border-color: rgba(255,209,0,.18); box-shadow: none; }
+.station-off .station-plate, .station-off * { animation: none !important; }
+
+.pipe-off { filter: grayscale(1) brightness(.55); opacity: .4; }
+.pipe-off .pipe-fluid { animation: none !important; opacity: .25; }
+.pipe-off .pipe-bit { display: none; }
+
+/* The scroller has overflow-x, which forces a computed overflow-y and a hard
+   scrollport edge. Smoke rising through it was being cut with a razor. Fade
+   the top band instead -- the plates sit below it on pt-14 clearance, so only
+   the plumes ever reach the gradient. */
+.factory-scroll {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 52px);
+          mask-image: linear-gradient(to bottom, transparent 0, #000 52px);
+}

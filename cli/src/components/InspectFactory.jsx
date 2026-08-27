@@ -173,12 +173,14 @@ const MarkBad = () => (
   <svg viewBox="0 0 12 12" className="h-2.5 w-2.5"><path d="M6 2v5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" /><circle cx="6" cy="10" r="1.2" fill="currentColor" /></svg>
 )
 
-function Pipe({ digits, reversed = false, dead = false, heat = 0, flowKey = 0, className = '' }) {
+// `dead` is damage -- red, burning. `off` is a line nobody is feeding: grey,
+// still, and carrying nothing. Two different facts, two different looks.
+function Pipe({ digits, reversed = false, dead = false, off = false, heat = 0, flowKey = 0, className = '' }) {
   return (
-    <div className={`pipe ${dead ? 'pipe-dead' : ''} ${reversed ? 'pipe-rev' : ''} ${className}`}>
+    <div className={`pipe ${off ? 'pipe-off' : dead ? 'pipe-dead' : ''} ${reversed ? 'pipe-rev' : ''} ${className}`}>
       <span className="pipe-fluid" />
-      {!dead && flowKey > 0 && <span key={flowKey} className="pipe-chevrons" aria-hidden="true">❯❯❯❯❯❯❯❯</span>}
-      {digits.map((d, i) => (
+      {!dead && !off && flowKey > 0 && <span key={flowKey} className="pipe-chevrons" aria-hidden="true">❯❯❯❯❯❯❯❯</span>}
+      {(off ? [] : digits).map((d, i) => (
         <span key={i} className="pipe-bit" style={{
           animationDelay: `${i * 0.42}s`, top: `${18 + (i % 3) * 26}%`,
           animationDuration: `${2.5 / (1 + heat * 2.5)}s`,
@@ -194,7 +196,7 @@ function Station({ n, tone, seal, onSeal, innerRef, footer, rail, editable = fal
   // does not restart a CSS animation, so consecutive rejections alternate.
   const shake = reject === 1 ? 'station-reject-a' : reject === 2 ? 'station-reject-b' : ''
   return (
-    <div ref={innerRef} className={`station relative z-10 w-44 shrink-0 ${tone === 'danger' ? 'station-hit' : tone === 'hot' ? 'station-live' : ''} ${editable ? 'station-console' : ''} ${sealed ? 'station-glass' : ''} ${shake}`}>
+    <div ref={innerRef} className={`station relative z-10 w-44 shrink-0 ${tone === 'danger' ? 'station-hit' : tone === 'hot' ? 'station-live' : tone === 'off' ? 'station-off' : ''} ${editable ? 'station-console' : ''} ${sealed ? 'station-glass' : ''} ${shake}`}>
       <div className="station-plate">
         <span className="rivet" style={{ left: 4, top: 4 }} /><span className="rivet" style={{ right: 4, top: 4 }} />
         <span className="rivet" style={{ left: 4, bottom: 4 }} /><span className="rivet" style={{ right: 4, bottom: 4 }} />
@@ -398,8 +400,9 @@ export function InspectFactory({ message, keypair, onClose, onRitual }) {
   // 'cipher' is the third source: station 3 holds a pasted ciphertext and the
   // plaintext ends become read-outs. It is a number, so none of the text
   // machinery (byte cap, packing) applies to it.
+  // Two directions only. Station 5 holds recovered plaintext, so composing
+  // from it was never sound -- there is nothing upstream of a result.
   const [dir, setDir] = useState('fwd')
-  const [out, setOut] = useState(message?.plaintext || 'HELLO')
   const [cipherDraft, setCipherDraft] = useState('')
   const [ray, setRay] = useState(null)
   const [beam, setBeam] = useState(null)
@@ -433,7 +436,8 @@ export function InspectFactory({ message, keypair, onClose, onRitual }) {
   const limit = maxBytesFor(keypair.publicKey.modulus)
 
   // The math never changes with direction. Only the string feeding it does.
-  const source = dir === 'back' ? out : draft
+  const source = draft
+  const locked = dir === 'cipher'   // stations 4 and 5 are downstream of nothing
 
   const line = useMemo(() => {
     if (dir === 'cipher') {
@@ -475,14 +479,14 @@ export function InspectFactory({ message, keypair, onClose, onRitual }) {
   // Damage cascades: a hit at stage i breaks every stage from i onward.
   const hitStage = ray ? STAGE_OF[ray.target] : Infinity
   // Damage always travels downstream. Downstream flips with the direction.
-  const broken = (stage) => (dir === 'back'
+  const broken = (stage) => (dir === 'cipher'
     ? ray != null && stage <= hitStage
     : stage >= hitStage)
   const toneOf = (stage) => (broken(stage) ? 'danger' : 'idle')
   // A pipe carries whatever the station behind it produced. Kill it only when
   // that feeder is broken -- a hit on station 3 does not poison 2 -> 3, which
   // is still delivering clean digits into the wreck. Upstream flips with dir.
-  const pipeDead = (lo, hi) => broken(dir === 'back' ? hi : lo)
+  const pipeDead = (lo, hi) => broken(dir === 'cipher' ? hi : lo)
   const rogueOf = (t, v) => (ray?.target === t ? Math.min(ray.at, String(v).length - 1) : null)
 
   useEffect(() => {
@@ -575,16 +579,21 @@ export function InspectFactory({ message, keypair, onClose, onRitual }) {
 
   // Both boxes feed the same counter, so the gauge, the coins, the eye and the
   // quake behave identically whichever end you are typing into.
+  // A soft keyboard's clipboard menu does not always fire `paste`. Length is
+  // the tell that always works: nobody types five characters in one event.
+  const KEYSTROKE_MAX = 4
   const typeInto = (which) => (event) => {
     const raw = event.target.value
-    const pasted = pasteRef.current
+    const prev = source.length
+    const pasted = pasteRef.current || Math.abs(event.target.value.length - prev) > KEYSTROKE_MAX
     pasteRef.current = false
     // The modulus is the wall. Refuse the character and shake the plate --
     // that lands harder than a meter creeping toward a number nobody reads.
     const value = clipBytes(raw, limit)
     if (value !== raw) setReject((r) => ({ which, n: r && r.n === 1 ? 2 : 1 }))
-    if (which === 'back') { setDir('back'); setOut(value); setDraft(value) }
-    else { setDir('fwd'); setDraft(value); setOut(value) }
+    // Touching station 1 re-opens the whole line: 4 and 5 come back on.
+    setDir('fwd')
+    setDraft(value)
     setFlowKey(Date.now())
     setRay(null); setSealAt(null)
     if (pasted) {
@@ -605,7 +614,7 @@ export function InspectFactory({ message, keypair, onClose, onRitual }) {
   // is already reduced mod N, so it always passes.
   const typeCipher = (event) => {
     const raw = event.target.value
-    const pasted = pasteRef.current
+    const pasted = pasteRef.current || Math.abs(raw.length - cipherDraft.length) > KEYSTROKE_MAX
     pasteRef.current = false
     // Whitespace is noise from copy-paste. Commas are block separators and
     // survive; everything between them still has to be a number under N.
@@ -628,8 +637,10 @@ export function InspectFactory({ message, keypair, onClose, onRitual }) {
   const markPaste = () => { pasteRef.current = true }
 
   const fire = () => {
-    if (dir === 'cipher') return  // nothing to corrupt; the operator IS the ray
-    const target = TARGETS[Math.floor(Math.random() * 3)]
+    // Station 3 is the operator's own paste and 4/5 are switched off, so in
+    // cipher mode the only thing downstream worth breaking is station 2.
+    const reachable = locked ? ['pack'] : TARGETS
+    const target = reachable[Math.floor(Math.random() * reachable.length)]
     const from = starRef.current?.getBoundingClientRect()
     const to = refs[target].current?.getBoundingClientRect()
     const box = panelRef.current?.getBoundingClientRect()
@@ -668,10 +679,10 @@ export function InspectFactory({ message, keypair, onClose, onRitual }) {
 
         <GloryBar wpm={wpm} tier={tier} ratchet={ratchet} />
 
-        <div className="relative z-10 overflow-x-auto px-4 pb-12 pt-14">
+        <div className="factory-scroll relative z-10 overflow-x-auto px-4 pb-12 pt-14">
           <div className="grid w-max" style={{ gridTemplateColumns: 'auto 4rem auto 4rem auto', gridTemplateRows: 'auto 7rem auto' }}>
 
-            <Station editable reject={reject?.which === 'fwd' ? reject.n : 0} n={dir === 'fwd' ? <Counter value={wpm} idle="1" hot={tier >= 1} rage={tier >= 2} /> : '1'} tone={dir === 'fwd' ? 'hot' : 'idle'}
+            <Station editable reject={reject?.which === 'fwd' ? reject.n : 0} n={dir === 'fwd' ? <Counter value={wpm} idle="1" hot={tier >= 1} rage={tier >= 2} /> : '1'} tone={dir === 'fwd' ? 'hot' : toneOf(1)}
               footer={<DeskLamp lit={!!pulse} />}
               rail={tip ? <span className="tip-bubble">{draft.length === 0 ? FIRST_LINE : tooltipLine()}</span> : null}>
               <textarea value={dir === 'cipher' ? (line.recovered || '') : source} rows={3}
@@ -679,14 +690,15 @@ export function InspectFactory({ message, keypair, onClose, onRitual }) {
                 placeholder={dir === 'cipher' && !line.ok ? '\u25a1\u25a1\u25a1' : undefined}
                 className={`w-full resize-none bg-transparent font-mono text-[11px] caret-[#ffd100] outline-none placeholder:text-[#fff6dc]/30 ${dir === 'cipher' && !line.ok ? 'text-[#ff2d78]' : 'text-white'}`} />
             </Station>
-            <Pipe digits={bits(line.m, 6)} heat={heat} flowKey={flowKey} dead={pipeDead(1, 2)} reversed={dir === 'back'} />
+            <Pipe digits={bits(line.m, 6)} heat={heat} flowKey={flowKey} dead={pipeDead(1, 2)} reversed={locked} />
             <Station n="2" sealed tone={toneOf(2)} innerRef={refs.pack} seal={!broken(2)} onSeal={() => setSealAt(sealAt === 2 ? null : 2)}>
               <Digits value={line.m} rogueAt={rogueOf('pack', line.m)} />
             </Station>
-            <Pipe digits={bits(line.cipher, 6)} heat={heat} flowKey={flowKey} dead={pipeDead(2, 3)} reversed={dir === 'back'} />
-            <Station editable n="3" reject={reject?.which === 'cipher' ? reject.n : 0}
-              tone={dir === 'cipher' ? 'hot' : toneOf(3)} innerRef={refs.lock}
-              seal={dir === 'cipher' ? null : !broken(3)} onSeal={() => setSealAt(sealAt === 3 ? null : 3)}>
+            <Pipe digits={bits(line.cipher, 6)} heat={heat} flowKey={flowKey} dead={pipeDead(2, 3)} reversed={locked} />
+            <Station editable reject={reject?.which === 'cipher' ? reject.n : 0}
+              n={locked ? <Counter value={wpm} idle="3" hot={tier >= 1} rage={tier >= 2} /> : '3'}
+              tone={locked ? 'hot' : toneOf(3)} innerRef={refs.lock}
+              seal={locked ? null : !broken(3)} onSeal={() => setSealAt(sealAt === 3 ? null : 3)}>
               <textarea rows={3} onChange={typeCipher} onPaste={markPaste}
                 value={dir === 'cipher' ? cipherDraft : line.cipher}
                 placeholder="paste a cipher\u2026"
@@ -694,18 +706,19 @@ export function InspectFactory({ message, keypair, onClose, onRitual }) {
             </Station>
 
             <div className="col-span-4 grid translate-y-2 place-items-center" ref={starRef}><RayStar armed={!!ray} onFire={fire} eye={tier >= 2 ? Math.min(1, (wpm - 100) / 30 + 0.35) : 0} gaze={gaze} /></div>
-            <div className="grid place-items-center"><Pipe digits={bits(line.wire, 4)} heat={heat} flowKey={flowKey} reversed={dir === 'back'} dead={pipeDead(3, 4)} className="pipe-v" /></div>
+            <div className="grid place-items-center"><Pipe digits={bits(line.wire, 4)} heat={heat} flowKey={flowKey} off={locked} dead={pipeDead(3, 4)} className="pipe-v" /></div>
 
-            <Station editable reject={reject?.which === 'back' ? reject.n : 0} n={dir === 'back' ? <Counter value={wpm} idle="5" hot={tier >= 1} rage={tier >= 2} /> : '5'} tone={dir === 'back' && !broken(5) ? 'hot' : toneOf(5)} seal={line.sigOk} onSeal={() => setSealAt(sealAt === 5 ? null : 5)}
-              footer={<DeskLamp lit={!!pulse} />}>
-              <textarea rows={3} onChange={typeInto('back')} onPaste={markPaste}
-                value={dir === 'back' ? out : (line.recovered || '')}
-                placeholder="□□□"
-                className={`w-full resize-none bg-transparent font-mono text-[11px] caret-[#ffd100] outline-none placeholder:text-[#fff6dc]/30 ${line.ok ? 'text-white' : 'text-[#ff2d78]'}`} />
+            <Station n="5" tone={locked ? 'off' : toneOf(5)} seal={locked ? null : line.sigOk} onSeal={() => setSealAt(sealAt === 5 ? null : 5)}
+              footer={locked ? null : <DeskLamp lit={!!pulse} />}>
+              <div className={`whitespace-pre-wrap break-all ${locked ? 'text-[#fff6dc]/20' : line.ok ? 'text-white' : 'text-[#ff2d78]'}`}>
+                {locked ? '□□□' : (line.recovered || '□□□')}
+              </div>
             </Station>
-            <Pipe digits={bits(line.wire, 10)} heat={heat} flowKey={flowKey} reversed={dir === 'fwd'} dead={pipeDead(4, 5)} className="col-span-3" />
-            <Station n="4" sealed tone={toneOf(4)} innerRef={refs.wire} seal={!broken(4)} onSeal={() => setSealAt(sealAt === 4 ? null : 4)}>
-              <Digits value={line.wire} rogueAt={rogueOf('wire', line.wire)} />
+            <Pipe digits={bits(line.wire, 10)} heat={heat} flowKey={flowKey} reversed off={locked} dead={pipeDead(4, 5)} className="col-span-3" />
+            <Station n="4" sealed tone={locked ? 'off' : toneOf(4)} innerRef={refs.wire}
+              seal={locked ? null : !broken(4)} onSeal={() => setSealAt(sealAt === 4 ? null : 4)}>
+              {locked ? <span className="text-[#fff6dc]/20">—</span>
+                      : <Digits value={line.wire} rogueAt={rogueOf('wire', line.wire)} />}
             </Station>
           </div>
         </div>

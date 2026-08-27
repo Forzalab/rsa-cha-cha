@@ -259,7 +259,9 @@ export function encryptText(text, publicKey) {
 
 export function decryptText(cipher, privateKey) {
   if (!privateKey?.modulus) throw new Error('No private key available.')
-  const blocks = String(cipher).split(BLOCK_SEP).map((part) => part.trim())
+  const blocks = String(cipher).split(BLOCK_SEP)
+    .map((part) => part.trim())
+    .filter((part) => part.length)   // a stray leading or trailing comma is not an error
   if (!blocks.length || blocks.some((part) => !/^\d+$/.test(part))) {
     throw new Error('Ciphertext is not a decimal integer.')
   }
