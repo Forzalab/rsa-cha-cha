@@ -15,9 +15,9 @@ using namespace std; // for convieniece
 // ---------------------------------------------------------------- BRIDGES
 // FILL THESE IN. Hardcoded on purpose -- no env vars, no config file, no key
 // management (handout section 2). Copy them off the BRIDGES account page.
-inline const std::string BRIDGES_USERNAME = "PUT_BRIDGES_USERNAME_HERE";
-inline const std::string BRIDGES_APIKEY   = "PUT_BRIDGES_APIKEY_HERE";
-inline constexpr unsigned int BRIDGES_ASSIGNMENT = 1;
+inline const std::string BRIDGES_USERNAME = "Knelt3801";
+inline const std::string BRIDGES_APIKEY   = "1528650419935";
+inline constexpr unsigned int BRIDGES_ASSIGNMENT = 69696969;
 
 namespace mp = boost::multiprecision;
 using cpp_int = mp::cpp_int;

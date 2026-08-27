@@ -55,9 +55,7 @@ inline const DemoKeys& demo_keys() {
 }
 
 inline bool bridges_configured() {
-    return BRIDGES_USERNAME != "Knelt3801" &&
-           BRIDGES_APIKEY != "1528650419935" &&
-           !BRIDGES_USERNAME.empty() && !BRIDGES_APIKEY.empty();
+    return !BRIDGES_USERNAME.empty() && !BRIDGES_APIKEY.empty();
 }
 
 // Every failure path in Bridges.h throws: a bare `const string&` on a curl
