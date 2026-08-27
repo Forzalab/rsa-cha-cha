@@ -234,23 +234,25 @@ inline URLString Utility::get_visualization_url(const cpp_int& p, const cpp_int&
 		// setLocation values reach the renderer unchanged, so they are real
 		// units, not a normalised range.
 		//
-		// p and q each feed BOTH N and T, so those four form K(2,2). Drawn as
-		// two columns that graph cannot avoid p->T crossing q->N. K(2,2) is
-		// planar though: seat the four on a diamond and the same four edges
-		// become its sides, crossing nothing. The tail runs off the near
-		// corner.
+		// Still crossing-free. p and q form K(2,2) with N and T, so those two
+		// have to flank N; T then lifts clear above the whole row and the
+		// tail hangs off it to the right.
 		//
-		//          N              p, q  the primes, left and right
-		//        /   \            N     public modulus, far corner
-		//       p     q           T     private intermediate, near corner
-		//        \   /
-		//          T  --> e --> d
-		keys.getVertex("p")->setLocation(120.0, 350.0);
-		keys.getVertex("N")->setLocation(340.0, 620.0);
-		keys.getVertex("q")->setLocation(560.0, 350.0);
-		keys.getVertex("T")->setLocation(340.0,  90.0);
-		keys.getVertex("e")->setLocation(720.0, 170.0);
-		keys.getVertex("d")->setLocation(950.0, 320.0);
+		//                T             p, q  the primes, flanking N
+		//            .-'/|\`-.         N     public modulus, between them
+		//           /  / | \   `.      T     private intermediate, lifted
+		//          p  N  q  d    e
+		//
+		// Recovered from a hand-dragged layout rather than guessed: the previous
+		// render was WYSIWYG for coordinates already known, which calibrates
+		// screen<->world to under a pixel, and the dragged positions invert
+		// straight back through that fit.
+		keys.getVertex("p")->setLocation(136.0, 259.0);
+		keys.getVertex("N")->setLocation(269.0, 316.0);
+		keys.getVertex("q")->setLocation(392.0, 247.0);
+		keys.getVertex("T")->setLocation(421.0, 499.0);
+		keys.getVertex("d")->setLocation(699.0, 253.0);
+		keys.getVertex("e")->setLocation(898.0, 287.0);
 
 		keys.addEdge("p", "N"); keys.addEdge("q", "N");
 		keys.addEdge("p", "T"); keys.addEdge("q", "T");
