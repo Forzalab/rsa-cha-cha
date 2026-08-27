@@ -102,6 +102,24 @@ const between = (low, high) => low + Math.random() * (high - low)
 
 export function AdStack() {
   const [cards, setCards] = useState(() => [{ id: nextId++ }])
+  // The weld. This component sits inside the sidebar, so an in-flow anchor
+  // div inherits the sidebar's true content width for free. Measure it, pin
+  // the fixed layer to that rectangle. No guessing, no viewport clamps.
+  const anchorRef = useRef(null)
+  const [band, setBand] = useState(null)
+  useEffect(() => {
+    const el = anchorRef.current
+    if (!el) return
+    const measure = () => {
+      const r = el.getBoundingClientRect()
+      setBand(r.width > 40 ? { left: r.left, width: r.width } : null)
+    }
+    measure()
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null
+    ro?.observe(el)
+    window.addEventListener('resize', measure)
+    return () => { ro?.disconnect(); window.removeEventListener('resize', measure) }
+  }, [])
   const [subliminal, setSubliminal] = useState(false)
   const streakRef = useRef(0)
   const sleepUntilRef = useRef(0)
@@ -179,7 +197,9 @@ export function AdStack() {
 
   return (
     <>
-      <div className="ad-swarm" aria-label="advertisements">
+      <div ref={anchorRef} aria-hidden="true" className="h-0 w-full" />
+      <div className="ad-swarm" aria-label="advertisements"
+        style={band ? { left: `${band.left - 8}px`, '--ad-w': `${band.width}px` } : undefined}>
         {cards.map((card) => (
           <AdCard key={card.id} seed={card.id} stage={stage} onDismiss={() => dismiss(card.id)} />
         ))}

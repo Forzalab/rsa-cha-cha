@@ -134,10 +134,11 @@ const MarkBad = () => (
   <svg viewBox="0 0 12 12" className="h-2.5 w-2.5"><path d="M6 2v5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" /><circle cx="6" cy="10" r="1.2" fill="currentColor" /></svg>
 )
 
-function Pipe({ digits, reversed = false, dead = false, heat = 0, className = '' }) {
+function Pipe({ digits, reversed = false, dead = false, heat = 0, flowKey = 0, className = '' }) {
   return (
     <div className={`pipe ${dead ? 'pipe-dead' : ''} ${reversed ? 'pipe-rev' : ''} ${className}`}>
       <span className="pipe-fluid" />
+      {!dead && flowKey > 0 && <span key={flowKey} className="pipe-chevrons" aria-hidden="true">❯❯❯❯❯❯❯❯</span>}
       {digits.map((d, i) => (
         <span key={i} className="pipe-bit" style={{
           animationDelay: `${i * 0.42}s`, top: `${18 + (i % 3) * 26}%`,
@@ -149,15 +150,15 @@ function Pipe({ digits, reversed = false, dead = false, heat = 0, className = ''
   )
 }
 
-function Station({ n, tone, seal, onSeal, innerRef, footer, rail, children }) {
+function Station({ n, tone, seal, onSeal, innerRef, footer, rail, editable = false, sealed = false, children }) {
   return (
-    <div ref={innerRef} className={`station relative z-10 w-44 shrink-0 ${tone === 'danger' ? 'station-hit' : tone === 'hot' ? 'station-live' : ''}`}>
+    <div ref={innerRef} className={`station relative z-10 w-44 shrink-0 ${tone === 'danger' ? 'station-hit' : tone === 'hot' ? 'station-live' : ''} ${editable ? 'station-console' : ''} ${sealed ? 'station-glass' : ''}`}>
       <div className="station-plate">
         <span className="rivet" style={{ left: 4, top: 4 }} /><span className="rivet" style={{ right: 4, top: 4 }} />
         <span className="rivet" style={{ left: 4, bottom: 4 }} /><span className="rivet" style={{ right: 4, bottom: 4 }} />
         <div className="flex items-center gap-1.5 border-b border-[#ffd100]/25 px-2 py-1">
           <span className="grid min-h-5 min-w-5 place-items-center border border-[#ffd100]/60 bg-[#ffd100]/10 px-1 font-mono text-[11px] font-black text-[#ffd100]">{n}</span>
-          {tone === 'hot' && <span className="ml-auto text-[11px]">✏️</span>}
+          {editable && <span className="ml-auto text-[11px]">✏️</span>}
           {seal != null && (
             <button type="button" onClick={onSeal} aria-label="signature"
               className={`ml-auto grid h-5 w-5 place-items-center rounded-full border font-mono text-[9px] font-black ${seal ? 'border-[#2dd4bf] bg-[#2dd4bf]/15 text-[#2dd4bf]' : 'seal-panic border-[#ff2d78] bg-[#ff2d78]/20 text-[#ff2d78]'}`}>
@@ -165,7 +166,10 @@ function Station({ n, tone, seal, onSeal, innerRef, footer, rail, children }) {
             </button>
           )}
         </div>
-        <div className="h-20 overflow-y-auto break-all p-2 font-mono text-[10px] leading-4 text-[#fff6dc]/85">{children}</div>
+        <div className="h-20 overflow-y-auto break-all p-2 font-mono text-[10px] leading-4 text-[#fff6dc]/85">
+          {sealed && <span className="glass-cover" aria-hidden="true" />}
+          {children}
+        </div>
       </div>
       {rail}
       {footer}
@@ -180,6 +184,9 @@ function Station({ n, tone, seal, onSeal, innerRef, footer, rail, children }) {
 
 function RayStar({ armed, onFire, eye = 0, gaze = { x: 0, y: 0 } }) {
   const [tip, setTip] = useState(false)
+  // A keystroke sends one chevron train down every pipe in the direction the
+  // line is running. The key restarts the animation; it dies on its own.
+  const [flowKey, setFlowKey] = useState(0)
   return (
     <button type="button" onClick={onFire} onMouseEnter={() => setTip(true)} onMouseLeave={() => setTip(false)}
       aria-label="cosmic ray" className="ray-star relative z-20 grid h-16 w-16 place-items-center bg-transparent">
@@ -314,6 +321,9 @@ export function InspectFactory({ message, keypair, onClose, onRitual }) {
   const [pulse, setPulse] = useState(0)
   const [gaze, setGaze] = useState({ x: 0, y: 0 })
   const [tip, setTip] = useState(false)
+  // A keystroke sends one chevron train down every pipe in the direction the
+  // line is running. The key restarts the animation; it dies on its own.
+  const [flowKey, setFlowKey] = useState(0)
   const [ratchet, setRatchet] = useState(false)
 
   const { wpm, feed, reset: resetWpm } = useWpm()
@@ -395,6 +405,18 @@ export function InspectFactory({ message, keypair, onClose, onRitual }) {
     return () => clearInterval(id)
   }, [wpm])
 
+  // No mousemove on touch devices, so the eye wanders on its own instead of
+  // sitting dead center. Fine pointers keep the cursor-tracking below.
+  useEffect(() => {
+    if (tier < 2) return
+    if (window.matchMedia?.('(pointer: fine)').matches) return
+    const id = window.setInterval(() => {
+      const angle = Math.random() * Math.PI * 2
+      setGaze({ x: Math.cos(angle) * 3.2, y: Math.sin(angle) * 3.2 })
+    }, 2500)
+    return () => window.clearInterval(id)
+  }, [tier])
+
   // Pupil follows the cursor, capped so it reads as a glance not a lurch.
   const trackRef = useRef(0)
   const onPanelMove = (event) => {
@@ -430,6 +452,7 @@ export function InspectFactory({ message, keypair, onClose, onRitual }) {
     const value = event.target.value
     if (which === 'back') { setDir('back'); setOut(value); setDraft(value) }
     else { setDir('fwd'); setDraft(value); setOut(value) }
+    setFlowKey(Date.now())
     setRay(null); setSealAt(null); setPulse(Date.now())
     feed(value.length)
     if (heat > 0.4 && Math.random() < 0.15) burstCoin()
@@ -471,17 +494,13 @@ export function InspectFactory({ message, keypair, onClose, onRitual }) {
 
         <div className="relative z-10 mb-4 flex items-center gap-3">
           <span className="font-mono text-[10px] text-[#f4e4c1]/45">🔑 {E.toString()} · {shorten(N.toString(), 10)}</span>
-          <button type="button" onClick={() => setDir(dir === 'fwd' ? 'back' : 'fwd')}
-            className="border border-[#ffd100]/50 px-2 py-0.5 font-mono text-[10px] text-[#ffd100] hover:bg-[#ffd100] hover:text-[#4a0410]">
-            {dir === 'fwd' ? '1 ▸ 5  encrypt' : '5 ▸ 1  decrypt'}
-          </button>
           <button type="button" onClick={onClose} aria-label="close" className="ml-auto grid h-7 w-7 place-items-center border-2 border-[#ffd100]/60 font-mono text-[#ffd100] hover:bg-[#ffd100] hover:text-[#4a0410]">×</button>
         </div>
 
         <div className="relative z-10 overflow-x-auto">
           <div className="grid w-max" style={{ gridTemplateColumns: 'auto 4rem auto 4rem auto', gridTemplateRows: 'auto 7rem auto' }}>
 
-            <Station n={<Counter value={wpm} hot={tier >= 1} rage={tier >= 2} />} tone={dir === 'fwd' ? 'hot' : 'idle'}
+            <Station editable n={<Counter value={wpm} hot={tier >= 1} rage={tier >= 2} />} tone={dir === 'fwd' ? 'hot' : 'idle'}
               footer={<DeskLamp lit={!!pulse} />}
               rail={<><GloryGauge wpm={wpm} ratchet={ratchet} />{tip && <span className="tip-bubble">{draft.length === 0 ? FIRST_LINE : tooltipLine()}</span>}</>}>
               <textarea value={source} rows={3} onChange={typeInto('fwd')}
@@ -490,27 +509,27 @@ export function InspectFactory({ message, keypair, onClose, onRitual }) {
                 <div className={`h-full transition-all ${over ? 'bg-[#ff2d78]' : fuel < 0.75 ? 'bg-[#2dd4bf]' : 'bg-[#ffd100]'}`} style={{ width: `${fuel * 100}%` }} />
               </div>
             </Station>
-            <Pipe digits={bits(line.m, 6)} heat={heat} dead={broken(2)} reversed={dir === 'back'} />
-            <Station n="2" tone={toneOf(2)} innerRef={refs.pack} seal={!broken(2)} onSeal={() => setSealAt(sealAt === 2 ? null : 2)}>
+            <Pipe digits={bits(line.m, 6)} heat={heat} flowKey={flowKey} dead={broken(2)} reversed={dir === 'back'} />
+            <Station n="2" sealed tone={toneOf(2)} innerRef={refs.pack} seal={!broken(2)} onSeal={() => setSealAt(sealAt === 2 ? null : 2)}>
               <Digits value={line.m} rogueAt={rogueOf('pack', line.m)} />
             </Station>
-            <Pipe digits={bits(line.cipher, 6)} heat={heat} dead={broken(3)} reversed={dir === 'back'} />
-            <Station n="3" tone={toneOf(3)} innerRef={refs.lock} seal={!broken(3)} onSeal={() => setSealAt(sealAt === 3 ? null : 3)}>
+            <Pipe digits={bits(line.cipher, 6)} heat={heat} flowKey={flowKey} dead={broken(3)} reversed={dir === 'back'} />
+            <Station n="3" sealed tone={toneOf(3)} innerRef={refs.lock} seal={!broken(3)} onSeal={() => setSealAt(sealAt === 3 ? null : 3)}>
               <Digits value={line.cipher} rogueAt={rogueOf('lock', line.cipher)} />
             </Station>
 
             <div className="col-span-4 grid translate-y-2 place-items-center" ref={starRef}><RayStar armed={!!ray} onFire={fire} eye={tier >= 2 ? Math.min(1, (wpm - 100) / 30 + 0.35) : 0} gaze={gaze} /></div>
-            <div className="grid place-items-center"><Pipe digits={bits(line.wire, 4)} heat={heat} reversed={dir === 'fwd'} dead={broken(4)} className="pipe-v" /></div>
+            <div className="grid place-items-center"><Pipe digits={bits(line.wire, 4)} heat={heat} flowKey={flowKey} reversed={dir === 'fwd'} dead={broken(4)} className="pipe-v" /></div>
 
-            <Station n="5" tone={dir === 'back' && !broken(5) ? 'hot' : toneOf(5)} seal={line.sigOk} onSeal={() => setSealAt(sealAt === 5 ? null : 5)}
+            <Station editable n="5" tone={dir === 'back' && !broken(5) ? 'hot' : toneOf(5)} seal={line.sigOk} onSeal={() => setSealAt(sealAt === 5 ? null : 5)}
               footer={<DeskLamp lit={!!pulse} />}>
               <textarea rows={3} onChange={typeInto('back')}
                 value={dir === 'back' ? out : (line.recovered || '')}
                 placeholder="□□□"
                 className={`w-full resize-none bg-transparent font-mono text-[11px] caret-[#ffd100] outline-none placeholder:text-[#fff6dc]/30 ${line.ok ? 'text-white' : 'text-[#ff2d78]'}`} />
             </Station>
-            <Pipe digits={bits(line.wire, 10)} heat={heat} reversed={dir === 'fwd'} dead={broken(5)} className="col-span-3" />
-            <Station n="4" tone={toneOf(4)} innerRef={refs.wire} seal={!broken(4)} onSeal={() => setSealAt(sealAt === 4 ? null : 4)}>
+            <Pipe digits={bits(line.wire, 10)} heat={heat} flowKey={flowKey} reversed={dir === 'fwd'} dead={broken(5)} className="col-span-3" />
+            <Station n="4" sealed tone={toneOf(4)} innerRef={refs.wire} seal={!broken(4)} onSeal={() => setSealAt(sealAt === 4 ? null : 4)}>
               <Digits value={line.wire} rogueAt={rogueOf('wire', line.wire)} />
             </Station>
           </div>
