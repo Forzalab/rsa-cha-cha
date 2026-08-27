@@ -174,7 +174,6 @@ export function useChatSocket(url = import.meta.env.VITE_WS_URL || DEFAULT_URL) 
   const send = useCallback((plaintext) => {
     const socket = socketRef.current
     if (!socket || socket.readyState !== WebSocket.OPEN || !username) return false
-    if (new TextEncoder().encode(plaintext).length > maxBytes) return false
     const now = Date.now()
     if (now - lastSendAtRef.current < SEND_COOLDOWN_MS) return false
     lastSendAtRef.current = now

@@ -6,7 +6,7 @@
 // warm flare when its digits move, red strobe when it takes a hit.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { decimalFromText, textFromDecimal, modPow, maxBytesFor } from '../lib/rsa.js'
+import { BLOCK_SEP, decimalFromText, textFromDecimal, modPow, maxBytesFor } from '../lib/rsa.js'
 import { markTakeover, markTier, tooltipLine } from '../lib/ritualState.js'
 
 // An empty box gets the plain invitation, always. "faster, comrade" means
@@ -442,8 +442,13 @@ export function InspectFactory({ message, keypair, onClose, onRitual }) {
       let recovered = ''
       if (digits) {
         try {
-          m = modPow(BigInt(digits), D, N)
-          recovered = textFromDecimal(m)
+          // A pasted ciphertext may be several blocks. Every block is one
+          // operation; the plaintext is the pieces put back in order.
+          const blocks = digits.split(BLOCK_SEP).filter((part) => part.length)
+          m = modPow(BigInt(blocks[0]), D, N)
+          recovered = blocks
+            .map((part) => textFromDecimal(modPow(BigInt(part), D, N)))
+            .join('')
         } catch { recovered = '' }
       }
       // No signature lane: a pasted cipher carries no signature to verify,
@@ -602,8 +607,11 @@ export function InspectFactory({ message, keypair, onClose, onRitual }) {
     const raw = event.target.value
     const pasted = pasteRef.current
     pasteRef.current = false
-    const digits = raw.replace(/[\s,]/g, '')
-    const bad = /\D/.test(digits) || (digits && BigInt(digits) >= N)
+    // Whitespace is noise from copy-paste. Commas are block separators and
+    // survive; everything between them still has to be a number under N.
+    const digits = raw.replace(/\s/g, '')
+    const blocks = digits.split(BLOCK_SEP).filter((part) => part.length)
+    const bad = /[^\d,]/.test(digits) || blocks.some((part) => BigInt(part) >= N)
     if (bad) {
       setReject((r) => ({ which: 'cipher', n: r && r.n === 1 ? 2 : 1 }))
       return
