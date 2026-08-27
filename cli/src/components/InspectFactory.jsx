@@ -112,27 +112,15 @@ function Digits({ value, rogueAt }) {
 
 // One lamp only, and it hangs off the bottom of the WRITE box. Swings and
 // runs hot while the operator types.
-function DeskLamp({ lit }) {
-  return (
-    <div className={`desklamp ${lit ? 'desklamp-flare' : ''}`}>
-      <span className="desklamp-cord" />
-      <svg viewBox="0 0 24 30" className="desklamp-body">
-        <path d="M8 25h8l2-3H6z" fill="#5a4a2e" />
-        <ellipse className="desklamp-bulb" cx="12" cy="14" rx="6" ry="7" />
-        <path d="M6 8h12v13a6 6 0 0 1-12 0z" fill="none" stroke="#6b5836" strokeWidth="1.2" />
-        <path d="M12 8v13M7 12h10M7 17h10" stroke="#6b5836" strokeWidth=".8" />
-      </svg>
-      <span className="desklamp-cone" />
-    </div>
-  )
-}
-
 // E and N are what somebody needs to encrypt to you, so they have to leave
 // this panel. navigator.clipboard is gated on a secure context and the site
 // is served over plain http -- the same trap that killed crypto.randomUUID on
 // the first deploy. execCommand is the fallback that still works there.
-function CopyBit({ label, value }) {
+function CopyBit({ label, value, beg = false }) {
   const [done, setDone] = useState(false)
+  // Once somebody has copied it, the hint has done its job. An affordance
+  // that keeps waving after you obeyed it is just nagging.
+  const [seen, setSeen] = useState(false)
   const copy = (event) => {
     event.stopPropagation()
     try {
@@ -149,10 +137,14 @@ function CopyBit({ label, value }) {
       pad.remove()
     }
     setDone(true)
+    setSeen(true)
     setTimeout(() => setDone(false), 900)
   }
+  const begging = beg && !seen
   return (
-    <button type="button" onClick={copy} title={`Copy ${value}`} aria-label={`Copy ${value}`} className="copybit">
+    <button type="button" onClick={copy} title={`Copy ${value}`} aria-label={`Copy ${value}`}
+      className={`copybit ${begging ? 'copybit-beg' : ''}`}>
+      {begging && <span className="copybit-ghost" aria-hidden="true">copy</span>}
       <span>{label}</span>
       <svg viewBox="0 0 14 14" className="copybit-mark" aria-hidden="true">
         {done
@@ -191,7 +183,7 @@ function Pipe({ digits, reversed = false, dead = false, off = false, heat = 0, f
   )
 }
 
-function Station({ n, tone, seal, onSeal, innerRef, footer, rail, editable = false, sealed = false, reject = 0, children }) {
+function Station({ n, tone, seal, onSeal, innerRef, footer, rail, head, editable = false, sealed = false, reject = 0, children }) {
   // Two class names, one animation each. Re-adding a class React never removed
   // does not restart a CSS animation, so consecutive rejections alternate.
   const shake = reject === 1 ? 'station-reject-a' : reject === 2 ? 'station-reject-b' : ''
@@ -204,6 +196,7 @@ function Station({ n, tone, seal, onSeal, innerRef, footer, rail, editable = fal
           <span className="grid min-h-5 min-w-5 place-items-center border border-[#ffd100]/60 bg-[#ffd100]/10 px-1 font-mono text-[11px] font-black text-[#ffd100]">{n}</span>
           <span className="ml-auto flex items-center gap-1.5">
             {editable && <span className="station-edit-tag">edit</span>}
+            {head}
             {seal != null && (
               <button type="button" onClick={onSeal} aria-label="signature"
                 className={`grid h-5 w-5 place-items-center rounded-full border font-mono text-[9px] font-black ${seal ? 'border-[#2dd4bf] bg-[#2dd4bf]/15 text-[#2dd4bf]' : 'seal-panic border-[#ff2d78] bg-[#ff2d78]/20 text-[#ff2d78]'}`}>
@@ -636,6 +629,22 @@ export function InspectFactory({ message, keypair, onClose, onRitual }) {
   }
   const markPaste = () => { pasteRef.current = true }
 
+  // A ciphertext is not something anybody composes by hand, so station 3 does
+  // not accept authored characters at all. `insertFromPaste` and the delete
+  // types still come through -- clipboard in, clipboard out, nothing typed.
+  //
+  // A PASTE button that reads the clipboard for you is not possible here:
+  // navigator.clipboard.readText needs a secure context and this is served
+  // over plain http. So the button only puts the caret where it belongs.
+  const cipherRef = useRef(null)
+  const refuseTyping = (event) => {
+    if (String(event.nativeEvent?.inputType || '').startsWith('insertFromPaste')) return
+    if (String(event.nativeEvent?.inputType || '').startsWith('delete')) return
+    event.preventDefault()
+    setReject((r) => ({ which: 'cipher', n: r && r.n === 1 ? 2 : 1 }))
+  }
+  const refuseEnter = (event) => { if (event.key === 'Enter') event.preventDefault() }
+
   const fire = () => {
     // Station 3 is the operator's own paste and 4/5 are switched off, so in
     // cipher mode the only thing downstream worth breaking is station 2.
@@ -673,7 +682,7 @@ export function InspectFactory({ message, keypair, onClose, onRitual }) {
           <span className="font-mono text-[10px] text-[#f4e4c1]/45">🔑</span>
           <CopyBit label={E.toString()} value={E.toString()} />
           <span className="font-mono text-[10px] text-[#f4e4c1]/25">·</span>
-          <CopyBit label={shorten(N.toString(), 10)} value={N.toString()} />
+          <CopyBit beg label={shorten(N.toString(), 10)} value={N.toString()} />
           <button type="button" onClick={onClose} aria-label="close" className="ml-auto grid h-7 w-7 place-items-center border-2 border-[#ffd100]/60 font-mono text-[#ffd100] hover:bg-[#ffd100] hover:text-[#4a0410]">×</button>
         </div>
 
@@ -683,7 +692,6 @@ export function InspectFactory({ message, keypair, onClose, onRitual }) {
           <div className="grid w-max" style={{ gridTemplateColumns: 'auto 4rem auto 4rem auto', gridTemplateRows: 'auto 7rem auto' }}>
 
             <Station editable reject={reject?.which === 'fwd' ? reject.n : 0} n={dir === 'fwd' ? <Counter value={wpm} idle="1" hot={tier >= 1} rage={tier >= 2} /> : '1'} tone={dir === 'fwd' ? 'hot' : toneOf(1)}
-              footer={<DeskLamp lit={!!pulse} />}
               rail={tip ? <span className="tip-bubble">{draft.length === 0 ? FIRST_LINE : tooltipLine()}</span> : null}>
               <textarea value={dir === 'cipher' ? (line.recovered || '') : source} rows={3}
                 onChange={typeInto('fwd')} onPaste={markPaste}
@@ -695,21 +703,27 @@ export function InspectFactory({ message, keypair, onClose, onRitual }) {
               <Digits value={line.m} rogueAt={rogueOf('pack', line.m)} />
             </Station>
             <Pipe digits={bits(line.cipher, 6)} heat={heat} flowKey={flowKey} dead={pipeDead(2, 3)} reversed={locked} />
-            <Station editable reject={reject?.which === 'cipher' ? reject.n : 0}
+            <Station sealed reject={reject?.which === 'cipher' ? reject.n : 0}
               n={locked ? <Counter value={wpm} idle="3" hot={tier >= 1} rage={tier >= 2} /> : '3'}
               tone={locked ? 'hot' : toneOf(3)} innerRef={refs.lock}
+              head={<span className="flex items-center gap-1">
+                <button type="button" onClick={() => cipherRef.current?.focus()}
+                  className="station-edit-tag">paste</button>
+                {locked && <button type="button" onClick={() => { setCipherDraft(''); setDir('fwd') }}
+                  className="station-edit-tag">×</button>}
+              </span>}
               seal={locked ? null : !broken(3)} onSeal={() => setSealAt(sealAt === 3 ? null : 3)}>
-              <textarea rows={3} onChange={typeCipher} onPaste={markPaste}
-                value={dir === 'cipher' ? cipherDraft : line.cipher}
-                placeholder="paste a cipher\u2026"
-                className="w-full resize-none bg-transparent font-mono text-[10px] text-[#fff6dc]/85 caret-[#ffd100] outline-none placeholder:text-[#fff6dc]/30" />
+              <textarea ref={cipherRef} rows={3} onChange={typeCipher} onPaste={markPaste}
+                onBeforeInput={refuseTyping} onKeyDown={refuseEnter}
+                value={locked ? cipherDraft : line.cipher}
+                placeholder="paste a cipher here"
+                className="relative z-[4] w-full resize-none bg-transparent font-mono text-[10px] text-[#fff6dc]/85 caret-[#ffd100] outline-none placeholder:text-[#fff6dc]/30" />
             </Station>
 
             <div className="col-span-4 grid translate-y-2 place-items-center" ref={starRef}><RayStar armed={!!ray} onFire={fire} eye={tier >= 2 ? Math.min(1, (wpm - 100) / 30 + 0.35) : 0} gaze={gaze} /></div>
             <div className="grid place-items-center"><Pipe digits={bits(line.wire, 4)} heat={heat} flowKey={flowKey} off={locked} dead={pipeDead(3, 4)} className="pipe-v" /></div>
 
-            <Station n="5" tone={locked ? 'off' : toneOf(5)} seal={locked ? null : line.sigOk} onSeal={() => setSealAt(sealAt === 5 ? null : 5)}
-              footer={locked ? null : <DeskLamp lit={!!pulse} />}>
+            <Station n="5" sealed tone={locked ? 'off' : toneOf(5)} seal={locked ? null : line.sigOk} onSeal={() => setSealAt(sealAt === 5 ? null : 5)}>
               <div className={`whitespace-pre-wrap break-all ${locked ? 'text-[#fff6dc]/20' : line.ok ? 'text-white' : 'text-[#ff2d78]'}`}>
                 {locked ? '□□□' : (line.recovered || '□□□')}
               </div>

@@ -14,6 +14,13 @@
 
 #include <exception>
 #include <string>
+#include <vector>
+
+struct BridgeReply {
+    bool ok = false;
+    std::string url;     // set when ok
+    std::string detail;  // set when !ok
+};
 
 // Bridges.h dumps the whole HTTP response into its exception text -- headers,
 // cf-ray, the lot. First line only, and short enough to sit in a toast.
@@ -24,36 +31,6 @@ inline std::string one_line(std::string text, std::size_t cap = 160) {
     return text;
 }
 
-// Same size as the browser (PRIME_DIGITS in cli/src/lib/rsa.js).
-inline constexpr prime_size BRIDGES_DEMO_DIGITS = 128;
-
-struct BridgeReply {
-    bool ok = false;
-    std::string url;     // set when ok
-    std::string detail;  // set when !ok
-};
-
-// The demo keypair. Generated once, on the first click, and kept -- so the
-// URL is stable and every click shows the same graph rather than a new one.
-struct DemoKeys {
-    cpp_int p, q, n, t;
-    key e, d;
-    DemoKeys() {
-        p = Utility::get_new_prime(BRIDGES_DEMO_DIGITS);
-        q = Utility::get_new_prime(BRIDGES_DEMO_DIGITS);
-        while (q == p) q = Utility::get_new_prime(BRIDGES_DEMO_DIGITS);
-        n = Utility::N(p, q);
-        t = Utility::T(p, q);
-        e = Utility::E(t, n);
-        d = Utility::D(e, t);
-    }
-};
-
-inline const DemoKeys& demo_keys() {
-    static const DemoKeys keys;
-    return keys;
-}
-
 inline bool bridges_configured() {
     return !BRIDGES_USERNAME.empty() && !BRIDGES_APIKEY.empty();
 }
@@ -61,13 +38,23 @@ inline bool bridges_configured() {
 // Every failure path in Bridges.h throws: a bare `const string&` on a curl
 // error, a bridges::RuntimeException after that, an HTTPException on a 401 or
 // a 413. An escaped throw here would take the whole server down with it.
-inline BridgeReply make_visualization() {
+//
+// The browser sends the bytes because the browser is the side that has them:
+// it holds the plaintext and it computed the ciphertext. The server paints
+// what it is handed and does no crypto of its own here.
+inline constexpr std::size_t BRIDGE_MAX_BYTES = 4096;
+
+inline BridgeReply make_visualization(std::vector<int> plain, std::vector<int> cipher) {
     if (!bridges_configured())
         return {false, "", "BRIDGES credentials are not filled in on the server."};
+    if (plain.empty() && cipher.empty())
+        return {false, "", "Nothing to draw -- send a message first."};
 
-    const DemoKeys& k = demo_keys();
+    if (plain.size()  > BRIDGE_MAX_BYTES) plain.resize(BRIDGE_MAX_BYTES);
+    if (cipher.size() > BRIDGE_MAX_BYTES) cipher.resize(BRIDGE_MAX_BYTES);
+
     try {
-        return {true, Utility::get_visualization_url(k.p, k.q, k.n, k.t, k.e, k.d), ""};
+        return {true, Utility::get_visualization_url(plain, cipher), ""};
     } catch (const std::string& text) {
         return {false, "", "BRIDGES rejected the post: " + one_line(text)};
     } catch (const std::exception& error) {

@@ -219,8 +219,11 @@ summary, [role="button"] { cursor: pointer; }
   95%           { transform: rotate(3deg) scale(1.02);    filter: drop-shadow(0 0 2px rgba(255, 209, 0, .35)); }
 }
 .react-idle:hover svg { animation: none; }
-/* half a cycle behind, so the composer never twitches both icons at once */
-.react-idle--offset svg { animation-delay: 2.25s; }
+/* Equal durations re-synchronise every cycle no matter what delay they start
+   with. Different periods drift apart and never line up twice. */
+.react-idle--b svg { animation-duration: 5.3s; animation-delay: 1.4s; }
+.react-idle--c svg { animation-duration: 6.7s; animation-delay: 3.1s; }
+.react-idle--d svg { animation-duration: 8.1s; animation-delay: 0.6s; }
 
 /* ─── unsent draft nudge ─── */
 .send-nudge { animation: send-nudge 2.4s ease-in-out infinite; }
@@ -1288,4 +1291,19 @@ summary, [role="button"] { cursor: pointer; }
 .factory-scroll {
   -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 52px);
           mask-image: linear-gradient(to bottom, transparent 0, #000 52px);
+}
+
+/* ------------------------------------------------------------- copy me
+   Loud until obeyed once, then silent forever. */
+.copybit-beg .copybit-mark { opacity: 1; color: #ffd100;
+  animation: copy-beg 1.6s ease-in-out infinite; }
+.copybit-ghost { font-family: 'Space Mono', monospace; font-size: 9px;
+  letter-spacing: .12em; text-transform: uppercase; color: #ffd100;
+  animation: copy-beg 1.6s ease-in-out infinite; }
+@keyframes copy-beg {
+  0%, 100% { opacity: .35; transform: scale(1); filter: drop-shadow(0 0 0 rgba(255,209,0,0)); }
+  50%      { opacity: 1;   transform: scale(1.22); filter: drop-shadow(0 0 7px rgba(255,209,0,.95)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .copybit-beg .copybit-mark, .copybit-ghost { animation: none !important; opacity: 1; }
 }

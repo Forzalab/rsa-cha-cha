@@ -19,7 +19,7 @@ namespace {
 
 // Matches the browser: PRIME_DIGITS in cli/src/lib/rsa.js. Both sides must
 // use comparable key sizes or a cipher from one will not fit the other.
-constexpr prime_size SELFTEST_DIGITS = 128;
+constexpr prime_size SELFTEST_DIGITS = 72;
 
 int selftest() {
     std::string plaintext;

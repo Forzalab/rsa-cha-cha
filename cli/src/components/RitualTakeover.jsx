@@ -8,7 +8,8 @@ import { bowLine, permuteColumns, zalgo } from '../lib/zalgo.js'
 const DURATION = 4000
 // 2.9Hz ceiling for photosensitivity. 345ms is one full strobe period.
 // Do not lower this number.
-const PERIOD = 345
+// Every swap is a re-read. At 345ms nobody finishes a word before it moves.
+const PERIOD = 720
 
 export function RitualTakeover({ name, self = false, onDone }) {
   const [words, setWords] = useState(permuteColumns)

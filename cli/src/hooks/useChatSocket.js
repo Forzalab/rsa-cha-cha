@@ -230,6 +230,22 @@ export function useChatSocket(url = import.meta.env.VITE_WS_URL || DEFAULT_URL) 
   // The POST to BRIDGES is a blocking curl on the server, so this can take a
   // couple of seconds. Nothing else in the room stalls; the server runs it off
   // the loop.
+  // The browser is the only side holding both halves: the plaintext it typed
+  // and the ciphertext it produced. Ship the bytes; the server only paints.
+  const bridgeBytes = useCallback(() => {
+    const mine = [...messages].reverse().find((item) => item.sender === username && item.plaintext)
+    const text = mine?.plaintext || ''
+    const cipher = mine?.cipher || ''
+    const plain = Array.from(new TextEncoder().encode(text))
+    const bytes = []
+    for (const block of String(cipher).split(',')) {
+      if (!/^\d+$/.test(block)) continue
+      let value = BigInt(block)
+      while (value > 0n) { bytes.push(Number(value % 256n)); value /= 256n }
+    }
+    return { plain, cipher: bytes }
+  }, [messages, username])
+
   const requestBridges = useCallback((done) => {
     const socket = socketRef.current
     if (!socket || socket.readyState !== WebSocket.OPEN || !username) {
@@ -238,14 +254,20 @@ export function useChatSocket(url = import.meta.env.VITE_WS_URL || DEFAULT_URL) 
     }
     if (bridgePendingRef.current) return
     bridgePendingRef.current = done
-    socket.send(JSON.stringify(bridgesRequest(username)))
+    const { plain, cipher } = bridgeBytes()
+    if (!plain.length) {
+      bridgePendingRef.current = null
+      done?.({ ok: false, detail: 'Send a message first -- there is nothing to draw.' })
+      return
+    }
+    socket.send(JSON.stringify(bridgesRequest(username, plain, cipher)))
     window.setTimeout(() => {
       const late = bridgePendingRef.current
       if (!late) return
       bridgePendingRef.current = null
       late({ ok: false, detail: 'BRIDGES did not answer in time.' })
     }, 20000)
-  }, [username])
+  }, [bridgeBytes, username])
 
   const react = useCallback((messageId, emoji) => {
     const socket = socketRef.current

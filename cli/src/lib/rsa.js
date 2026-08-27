@@ -7,19 +7,27 @@
 // Speed is the priority over key strength here -- this is a class demo on a
 // projector, not a key that guards anything. Both knobs are below.
 
-// Each prime; N lands at roughly twice this. The cap on one block is
-// floor(log256(N)) bytes, which grows linearly with this number -- while a
-// modPow grows about cubically with it. Measured in node, per keypair:
+// Each prime; N lands at roughly twice this.
 //
-//    64d -> 52B cap,    5ms keygen,  0.8ms per inspect recompute
-//    96d -> 79B cap,    7ms keygen,  1.9ms
-//   128d -> 106B cap,  32ms keygen,  4.1ms
-//   192d -> 159B cap,  58ms keygen, 10.7ms
-//   256d -> 212B cap, 154ms keygen, 23.7ms   <- 4x the room, 30x the work
+// Since chunking landed, total ciphertext length no longer depends on this
+// number at all. A block's cipher is about len(N) digits and you need
+// bytes/cap of them, where cap is about len(N)/2.408 -- the len(N) cancels.
+// Measured, same 183-byte paragraph:
 //
-// 64 was also a hard ceiling on the wpm counter: 52 bytes x 2.4 = 125 wpm,
-// and the top tier is 130. The gauge could not physically be filled.
-export const PRIME_DIGITS = 128
+//    64d -> N 128 digits, cap  53B, 4 blocks,  515 cipher chars
+//    72d -> N 144 digits, cap  59B, 4 blocks,  578 cipher chars
+//    96d -> N 192 digits, cap  79B, 3 blocks,  576 cipher chars
+//   128d -> N 255 digits, cap 105B, 2 blocks,  511 cipher chars
+//
+// So N now decides only two things: how many bytes ride in one block, and how
+// much screen a single number eats. 255 digits was a wall of text on the
+// inspect panel and bought nothing on the wire.
+//
+// The floor is the glory bar. cap x 2.4 is the reachable wpm ceiling and the
+// top tier is 130, so cap must stay above ~55 bytes or the counter can never
+// be filled -- the exact hard ceiling that took a patch to remove. 72-digit
+// primes give cap ~59 and a ceiling near 142. Do not go lower than 68.
+export const PRIME_DIGITS = 72
 export const MILLER_RABIN_ROUNDS = 5
 
 // ---------------------------------------------------------------- big-int math

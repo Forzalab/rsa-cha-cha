@@ -116,7 +116,7 @@ class Hub {
     void do_lookup(const std::shared_ptr<Session>&, const json&);
     void do_send(const std::shared_ptr<Session>&, const json&);
     void do_ai(const std::shared_ptr<Session>&, const json&);
-    void do_bridges(const std::shared_ptr<Session>&);
+    void do_bridges(const std::shared_ptr<Session>&, const json&);
     void announce_members();
 
     std::map<std::string, Entry> dir_;
@@ -259,7 +259,7 @@ inline void Hub::route(const std::shared_ptr<Session>& from, const std::string& 
     } else if (request == "AI_KERNEY") {
         do_ai(from, msg);
     } else if (request == "BRIDGES") {
-        do_bridges(from);
+        do_bridges(from, msg);
     } else {
         from->send(envelope("SERVER", from->userid(), "ERR_UNSPC"));
     }
@@ -296,8 +296,18 @@ inline void Hub::do_ai(const std::shared_ptr<Session>& from, const json& msg) {
 
 // One click, one POST, one answer, to the tab that asked. Nobody else in the
 // room cares that somebody opened a graph.
-inline void Hub::do_bridges(const std::shared_ptr<Session>& from) {
-    std::thread([from] { from->post_bridge_reply(make_visualization()); }).detach();
+inline void Hub::do_bridges(const std::shared_ptr<Session>& from, const json& msg) {
+    const json content = msg.value("content", json::object());
+    auto bytes = [&content](const char* field) {
+        std::vector<int> out;
+        if (!content.contains(field) || !content[field].is_array()) return out;
+        for (const auto& item : content[field])
+            if (item.is_number_integer()) out.push_back(item.get<int>() & 0xff);
+        return out;
+    };
+    std::thread([from, plain = bytes("plain"), cipher = bytes("cipher")] {
+        from->post_bridge_reply(make_visualization(plain, cipher));
+    }).detach();
 }
 
 inline void Hub::broadcast_ai(const GeminiReply& reply, const std::string& message_id) {

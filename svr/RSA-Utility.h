@@ -9,7 +9,11 @@
 #include <string> // bcs strings is rad
 #include <Bridges.h> // Bridges libs/include 
 #include <boost/random.hpp> // for random num generator 
-#include <GraphAdjList.h> 
+#include <ColorGrid.h>
+#include <vector>
+#include <algorithm>
+#include <cstddef>
+
 using namespace std; // for convieniece
 
 // ---------------------------------------------------------------- BRIDGES
@@ -24,7 +28,6 @@ using cpp_int = mp::cpp_int;
 using key = cpp_int;
 using prime_size = uint32_t;
 using URLString = string;
-using GraphAdjList = bridges::datastructure::GraphAdjList<string, string, string>;
 // interfaces - avoid .h to reduce complexity for newbies
 // To Bruce: only implement in the brackets below the class braxket, dont fill out anything in Utility class scope!!!!! <3
 // its gonna be a rabbit hole, lol
@@ -41,7 +44,12 @@ class Utility {
 		static bool is_small_prime(const cpp_int& x);
 		static key E(const cpp_int& t, const cpp_int& n); /// 65537 unless N is smaller
 		static key D(const key& e, const cpp_int& t);
-		static URLString get_visualization_url(const cpp_int& p, const cpp_int& q, const cpp_int& n, const cpp_int& t, const key& e, const key& d); // MUST return a string - param can be anything u please. if change param, change it both at declaration + definition, or u will get compile err
+		// Two bands of bytes, plaintext over ciphertext, in one grid. Hue is
+		// the byte value. Readable text lives in a narrow slice of the byte
+		// range, so the top band comes out banded and repetitive; ciphertext
+		// is spread flat across all 256 values, so the bottom band is static.
+		// The picture argues for itself. Nothing has to be captioned.
+		static URLString get_visualization_url(const std::vector<int>& plain, const std::vector<int>& cipher);
 		static bridges::Bridges get_bridges();
 };
 
@@ -129,28 +137,51 @@ inline key Utility::D(const key& e, const cpp_int& n) {
 	return d;
 }    
 
-inline URLString Utility::get_visualization_url(const cpp_int& p, const cpp_int& q, const cpp_int& n, const cpp_int& t, const key& e, const key& d) {
+// Byte value -> colour, straight round the hue circle. A plain ramp would put
+// every printable character into one narrow patch of grey and the two bands
+// would look alike; spreading them over the full circle is what makes the
+// difference visible from across a room.
+inline bridges::Color byte_hue(int byte) {
+	const double h = (byte / 256.0) * 6.0;   // sixths of the circle
+	const int    seg = static_cast<int>(h);
+	const double f = h - seg;
+	const int    hi = 242, lo = 38;
+	const int    up = lo + static_cast<int>((hi - lo) * f);
+	const int    dn = hi - static_cast<int>((hi - lo) * f);
+	switch (seg) {
+		case 0:  return bridges::Color(hi, up, lo);
+		case 1:  return bridges::Color(dn, hi, lo);
+		case 2:  return bridges::Color(lo, hi, up);
+		case 3:  return bridges::Color(lo, dn, hi);
+		case 4:  return bridges::Color(up, lo, hi);
+		default: return bridges::Color(hi, lo, dn);
+	}
+}
+
+inline URLString Utility::get_visualization_url(const std::vector<int>& plain,
+                                                const std::vector<int>& cipher) {
 	bridges::Bridges bridges(BRIDGES_ASSIGNMENT, BRIDGES_USERNAME, BRIDGES_APIKEY);
 
+	const int COLS = 48;
+	const int GAP  = 2;                       // dark rule between the bands
+	const auto rows_for = [&](std::size_t n) {
+		return static_cast<int>((n + COLS - 1) / COLS);
+	};
+	const int top    = std::max(1, rows_for(plain.size()));
+	const int bottom = std::max(1, rows_for(cipher.size()));
 
-	bridges::datastructure::GraphAdjList<string, string, int> graph;
+	bridges::datastructure::ColorGrid grid(top + GAP + bottom, COLS,
+	                                       bridges::Color(14, 14, 18));
 
-	graph.addVertex("p", p.str());
-	graph.addVertex("q", q.str());
-	graph.addVertex("N", n.str());
-	graph.addVertex("totient", t.str());
-	graph.addVertex("e", e.str());
-	graph.addVertex("d", d.str());
+	for (std::size_t i = 0; i < plain.size(); ++i)
+		grid.set(static_cast<int>(i / COLS), static_cast<int>(i % COLS),
+		         byte_hue(plain[i] & 0xff));
 
-	graph.addEdge("p", "N", 1);
-	graph.addEdge("q", "N", 1);
-	graph.addEdge("p", "totient", 1);
-	graph.addEdge("q", "totient", 1);
-	graph.addEdge("totient", "e", 1);
-	graph.addEdge("e", "d", 1);
+	for (std::size_t i = 0; i < cipher.size(); ++i)
+		grid.set(top + GAP + static_cast<int>(i / COLS), static_cast<int>(i % COLS),
+		         byte_hue(cipher[i] & 0xff));
 
-
-	bridges.setDataStructure(&graph);
+	bridges.setDataStructure(&grid);
 	bridges.visualize();   // throws on a bad key, a dead server, or a 413
 
 	// Ask the library rather than rebuilding the string. Bridges.h builds it

@@ -16,8 +16,8 @@ export function sendMessage(sender, receiver, cipher, metadata = {}) {
   return makeEnvelope(sender, receiver, 'SEND', { cipher, ...metadata })
 }
 
-export function bridgesRequest(sender) {
-  return makeEnvelope(sender, SERVER_ID, 'BRIDGES', {})
+export function bridgesRequest(sender, plain = [], cipher = []) {
+  return makeEnvelope(sender, SERVER_ID, 'BRIDGES', { plain, cipher })
 }
 
 export function kerneyRequest(sender, prompt, messageId) {
