@@ -4,13 +4,16 @@ import { JoinModal } from './components/JoinModal.jsx'
 import { RsaMatrixBackground } from './components/RsaMatrixBackground.jsx'
 import { useChatSocket } from './hooks/useChatSocket.js'
 import { parseStickerMessage, STICKERS, stickerShortcode } from './lib/stickers.js'
-import { EMOJIS } from './lib/emojis.js'
+import { EMOJIS, letterRows } from './lib/emojis.js'
 import { isKerney, isRosasName, joinSlug } from './lib/joinSlugs.js'
 import { BOT_ID, displayName } from './lib/names.js'
 import { ping, unlockPing } from './lib/ping.js'
 import { CipherReveal } from './components/CipherReveal.jsx'
 import { PropagandaFrame } from './components/PropagandaFrame.jsx'
-import { InspectFactory, OvaltineAd, SidebarAd } from './components/InspectFactory.jsx'
+import { InspectFactory, OvaltineAd } from './components/InspectFactory.jsx'
+import { AdStack } from './components/AdStack.jsx'
+import { RitualTakeover } from './components/RitualTakeover.jsx'
+import { closeSlug, seekSlug } from './lib/zalgo.js'
 
 const MAX_MESSAGE_LENGTH = 500
 const SEND_COOLDOWN_MS = 400
@@ -136,12 +139,34 @@ function RollingPlaceholder() {
   )
 }
 
+// Both pickers open with the same two rows. One <button> per glyph keeps
+// adjacent regional indicators from fusing into a flag.
+function LetterRows({ onPick, size = 'text-xl' }) {
+  return (
+    <div className="mb-2 border-b border-[#ffd100]/25 pb-2">
+      {letterRows().map((row, r) => (
+        <div className="flex gap-1" key={r}>
+          {row.map((glyph, c) => (
+            <button type="button" key={`${r}-${c}`} onClick={() => onPick(glyph)}
+              aria-label={`Add ${glyph}`}
+              className={`grid aspect-square flex-1 place-items-center rounded-[2px] ${size} transition duration-150 hover:scale-125 hover:bg-[#ffd100]/15`}>{glyph}</button>
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function JoinSlug({ notice }) {
   const tone = notice.kind === 'kerney'
     ? 'text-[#ffd100] slug-jackpot'
     : notice.kind === 'rosas'
       ? 'text-[#ff86ae]'
-      : 'text-[#fff6dc]/45'
+      : notice.kind === 'ritual'
+        ? 'text-[#ffe873] slug-jackpot'
+        : notice.kind === 'ritual-close'
+          ? 'text-[#c7b28a]/70'
+          : 'text-[#fff6dc]/45'
   return (
     <div className="join-slug my-1 flex items-center gap-2.5 px-4">
       <span className="h-px flex-1 bg-[#fff6dc]/12" />
@@ -183,7 +208,7 @@ export default function App() {
   const [freshMembers, setFreshMembers] = useState([])
   const [inspecting, setInspecting] = useState(null)
   const [adGate, setAdGate] = useState(false)
-  const [sideAdGone, setSideAdGone] = useState(false)
+
   const [adSeen, setAdSeen] = useState(false)
   // One state machine for the whole frame. Overlapping triggers cannot stack
   // because every transition is scheduled off a single stage value.
@@ -235,6 +260,34 @@ export default function App() {
 
     if (others.some(isKerney)) runJackpot()
   }, [chat.members])
+
+  // Ritual plumbing. Tier 2 is a slug only. Tier 3 mounts the takeover, and
+  // the closing slug is posted when the overlay releases -- so every bystander
+  // has a thread to pull instead of believing the site broke.
+  const [takeover, setTakeover] = useState(null)
+  const ritualSeenRef = useRef(null)
+  const pushNotice = useCallback((kind, text) => {
+    setNotices((current) => [
+      ...current,
+      { id: `${kind}:${Date.now()}:${current.length}`, anchor: chat.messages.length, kind, text },
+    ])
+  }, [chat.messages.length])
+
+  useEffect(() => {
+    const event = chat.ritualEvent
+    if (!event || ritualSeenRef.current === event.id) return
+    ritualSeenRef.current = event.id
+    pushNotice('ritual', seekSlug(event.name))
+    if (event.tier >= 3) setTakeover(event)
+    chat.clearRitual()
+  }, [chat.ritualEvent])
+
+  const endTakeover = useCallback(() => {
+    setTakeover((current) => {
+      if (current) pushNotice('ritual-close', closeSlug(current.name))
+      return null
+    })
+  }, [pushNotice])
 
   const noticesAt = (index) => notices.filter((notice) => notice.anchor === index)
 
@@ -368,7 +421,7 @@ export default function App() {
             ))}
           </div>
           <div className="mt-auto space-y-3">
-          {!sideAdGone && <SidebarAd onDismiss={() => setSideAdGone(true)} />}
+          <AdStack />
             <button type="button" tabIndex={showNewMessages ? 0 : -1} aria-hidden={!showNewMessages} onClick={() => scrollToNewest()} className={`flex w-full items-center justify-center gap-2 border-2 border-[#4a0410] bg-[#ffd100] px-3 py-2.5 text-xs font-bold text-[#4a0410] shadow-[0_3px_0_#4a0410] transition-all duration-300 hover:-translate-y-0.5 ${showNewMessages ? 'new-message-badge opacity-100' : 'pointer-events-none translate-y-2 opacity-0'}`}><ArrowDown size={14} /> View new messages</button>
 
           </div>
@@ -482,7 +535,7 @@ export default function App() {
                         {reactions.length > 0 && <p className="px-2 pb-1.5 text-[10px] font-semibold uppercase tracking-[.16em] text-[#f4e4c1]/45">Reactions</p>}
                         {reactions.length > 0 && <div className="mb-2 flex flex-wrap gap-1 border-b border-white/8 pb-2">{reactions.map(([emoji, people]) => <button type="button" key={emoji} onClick={() => chat.react(message.id, emoji)} title={people.join(', ')} className={`flex items-center gap-1 rounded-full px-2 py-1 text-xs transition ${people.includes(chat.username) ? 'bg-red-500/15 ring-1 ring-red-400/25' : 'bg-white/5 hover:bg-red-500/10'}`}><span>{emoji}</span><span className="text-[10px] text-[#ffd100]/80">{people.length}</span></button>)}</div>}
                         <div className="mb-1 flex items-center gap-1 px-1 text-[10px] font-semibold uppercase tracking-[.16em] text-[#f4e4c1]/45"><SmilePlus size={12} /> Add reaction</div>
-                        <div className="grid max-h-40 w-64 grid-cols-8 gap-0.5 overflow-y-auto pr-1">{EMOJIS.map((emoji) => <button type="button" key={emoji} onClick={() => { chat.react(message.id, emoji); setOpenReactions(null) }} className="grid h-8 w-8 place-items-center rounded-lg text-base transition hover:scale-125 hover:bg-white/8" aria-label={`React with ${emoji}`}>{emoji}</button>)}</div>
+                        <div className="max-h-40 w-64 overflow-y-auto pr-1"><LetterRows size="text-base" onPick={(glyph) => { chat.react(message.id, glyph); setOpenReactions(null) }} /><div className="grid grid-cols-8 gap-0.5">{EMOJIS.map((emoji) => <button type="button" key={emoji} onClick={() => { chat.react(message.id, emoji); setOpenReactions(null) }} className="grid h-8 w-8 place-items-center rounded-lg text-base transition hover:scale-125 hover:bg-white/8" aria-label={`React with ${emoji}`}>{emoji}</button>)}</div></div>
                       </div>
                     )}
                   </div>
@@ -510,9 +563,9 @@ export default function App() {
             {emojiPickerOpen && (
               <div onClick={(event) => event.stopPropagation()} className="sticker-pop absolute bottom-[5.4rem] left-4 z-30 w-[min(22rem,calc(100vw-2rem))] rounded-[2px] border border-[#ffd100]/70 bg-[#12010a] p-3 shadow-[8px_8px_0_rgba(0,0,0,.5)] sm:left-5">
                 <div className="mb-3 border-b border-[#ffd100]/25 px-1 pb-2"><p className="text-sm font-bold text-[#ffd100]">Emoji</p><p className="mt-0.5 text-[10px] text-[#fff6dc]/50">Add some personality to your message</p></div>
-                <div className="grid max-h-64 grid-cols-8 gap-1 overflow-y-auto pr-1">
+                <div className="max-h-64 overflow-y-auto pr-1"><LetterRows onPick={(glyph) => setDraft((current) => `${current}${current && !current.endsWith(' ') ? ' ' : ''}${glyph}`)} /><div className="grid grid-cols-8 gap-1">
                   {EMOJIS.map((emoji) => <button type="button" key={emoji} onClick={() => setDraft((current) => `${current}${current && !current.endsWith(' ') ? ' ' : ''}${emoji}`)} className="grid aspect-square place-items-center rounded-[2px] text-xl transition duration-150 hover:scale-125 hover:bg-[#ffd100]/15" aria-label={`Add ${emoji}`}>{emoji}</button>)}
-                </div>
+                </div></div>
               </div>
             )}
             <div className="flex items-center gap-2 rounded-[2px] border border-[#ffd100]/70 bg-[#12010a] px-2 py-1.5 shadow-[6px_6px_0_rgba(0,0,0,.45)] transition-colors duration-200 focus-within:border-[#ffd100] focus-within:bg-[#0c0107]">
@@ -531,7 +584,8 @@ export default function App() {
         </div>
       </section>
       {inspecting && adGate && <OvaltineAd onSkip={() => { setAdGate(false); setAdSeen(true) }} />}
-{inspecting && !adGate && <InspectFactory message={inspecting} keypair={chat.keypair} onClose={() => setInspecting(null)} />}
+{inspecting && !adGate && <InspectFactory message={inspecting} keypair={chat.keypair} onClose={() => setInspecting(null)} onRitual={chat.sendRitual} />}
+      {takeover && <RitualTakeover name={takeover.name} self={takeover.self} onDone={endTakeover} />}
     </main>
   )
 }

@@ -10,6 +10,9 @@ const newId = () =>
 const DEFAULT_URL = `ws://${window.location.hostname || 'localhost'}:6868`
 
 const SEND_COOLDOWN_MS = 400
+// One ritual per 30 seconds per tab. Fast typing crosses a tier many times in
+// a row; without this the room eats a broadcast storm.
+const RITUAL_COOLDOWN_MS = 30000
 export function useChatSocket(url = import.meta.env.VITE_WS_URL || DEFAULT_URL) {
   const socketRef = useRef(null)
   const pendingJoinRef = useRef(null)
@@ -28,6 +31,11 @@ export function useChatSocket(url = import.meta.env.VITE_WS_URL || DEFAULT_URL) 
   const [error, setError] = useState('')
   const [messages, setMessages] = useState([])
   const [kerneyThinking, setKerneyThinking] = useState(false)
+  // Latest ritual event, local or remote. App drains it and clears it.
+  const [ritualEvent, setRitualEvent] = useState(null)
+  // Cooldown is per tier. Ramping 0 -> 130 crosses 100 first, and a shared
+  // clock would let the announcement eat the takeover that follows it.
+  const lastRitualAtRef = useRef({})
 
   const applyReaction = useCallback((messageId, emoji, sender, action = 'ADD') => {
     setMessages((current) => current.map((message) => {
@@ -83,6 +91,15 @@ export function useChatSocket(url = import.meta.env.VITE_WS_URL || DEFAULT_URL) 
           const plaintext = decryptText(message.content?.cipher ?? '', keypairRef.current.privateKey)
           if (message.content?.kind === 'REACTION') {
             applyReaction(message.content.message_id, plaintext, message.sender, message.content.reaction_action)
+          } else if (message.content?.kind === 'RITUAL') {
+            // The tier rides inside the ciphertext like any other payload, so
+            // the relay never learns what happened.
+            setRitualEvent({
+              id: message.content?.event_id ?? newId(),
+              name: message.sender,
+              tier: Number(plaintext) || 2,
+              self: false,
+            })
           } else {
             setMessages((current) => [...current, {
               id: message.content?.message_id ?? newId(),
@@ -180,6 +197,28 @@ export function useChatSocket(url = import.meta.env.VITE_WS_URL || DEFAULT_URL) 
     return true
   }, [keyDirectory, members, username])
 
+  // Tier 2 puts a slug in the room. Tier 3 swallows the whole site.
+  const sendRitual = useCallback((tier) => {
+    const socket = socketRef.current
+    if (!socket || socket.readyState !== WebSocket.OPEN || !username) return false
+    const now = Date.now()
+    if (now - (lastRitualAtRef.current[tier] ?? 0) < RITUAL_COOLDOWN_MS) return false
+    lastRitualAtRef.current[tier] = now
+
+    const eventId = newId()
+    for (const recipient of members.filter((member) => member !== username)) {
+      const recipientKey = keyDirectory[recipient]
+      if (!recipientKey) continue
+      try {
+        socket.send(JSON.stringify(sendMessage(username, recipient,
+          encryptText(String(tier), recipientKey),
+          { kind: 'RITUAL', message_id: eventId, event_id: eventId })))
+      } catch { /* a dead key must not stop the rest of the room */ }
+    }
+    setRitualEvent({ id: eventId, name: username, tier, self: true })
+    return true
+  }, [keyDirectory, members, username])
+
   const react = useCallback((messageId, emoji) => {
     const socket = socketRef.current
     if (!socket || socket.readyState !== WebSocket.OPEN || !username) return
@@ -198,6 +237,7 @@ export function useChatSocket(url = import.meta.env.VITE_WS_URL || DEFAULT_URL) 
 
   return {
     status, username, members, keyDirectory, messages, kerneyThinking, error,
+    ritualEvent, sendRitual, clearRitual: () => setRitualEvent(null),
     publicKey: keypairRef.current.publicKey, keypair: keypairRef.current, maxBytes,
     join, send, react, clearError: () => setError(''),
   }
