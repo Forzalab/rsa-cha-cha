@@ -10,6 +10,7 @@
 #include <Bridges.h> // Bridges libs/include 
 #include <boost/random.hpp> // for random num generator 
 #include <ColorGrid.h>
+#include <GraphAdjList.h>
 #include <vector>
 #include <algorithm>
 #include <cstddef>
@@ -49,7 +50,14 @@ class Utility {
 		// range, so the top band comes out banded and repetitive; ciphertext
 		// is spread flat across all 256 values, so the bottom band is static.
 		// The picture argues for itself. Nothing has to be captioned.
-		static URLString get_visualization_url(const std::vector<int>& plain, const std::vector<int>& cipher);
+		// Two slides under one URL. Slide 1 is the keypair: six labelled nodes
+		// wired in the order they are actually derived. Slide 2 is the same
+		// message twice over, plaintext bytes above ciphertext bytes.
+		static URLString get_visualization_url(const cpp_int& p, const cpp_int& q,
+		                                        const cpp_int& n, const cpp_int& t,
+		                                        const key& e, const key& d,
+		                                        const std::vector<int>& plain,
+		                                        const std::vector<int>& cipher);
 		static bridges::Bridges get_bridges();
 };
 
@@ -137,6 +145,19 @@ inline key Utility::D(const key& e, const cpp_int& n) {
 	return d;
 }    
 
+// Verified against Element.h: the node JSON carries color, location, shape,
+// size and `name` -- and `name` is the LABEL. The second argument to
+// addVertex lands in `value`, which is never serialised. That is the whole
+// reason the first attempt rendered six bare names: the numbers were being
+// stored somewhere the browser never reads. setLabel is the only way in.
+inline std::string node_text(const std::string& name, const cpp_int& v) {
+	const std::string digits = v.str();
+	if (digits.size() <= 22) return name + " = " + digits;
+	return name + " = " + digits.substr(0, 10) + "\u2026" +
+	       digits.substr(digits.size() - 6) + "  (" +
+	       std::to_string(digits.size()) + " digits)";
+}
+
 // Byte value -> colour, straight round the hue circle. A plain ramp would put
 // every printable character into one narrow patch of grey and the two bands
 // would look alike; spreading them over the full circle is what makes the
@@ -158,10 +179,72 @@ inline bridges::Color byte_hue(int byte) {
 	}
 }
 
-inline URLString Utility::get_visualization_url(const std::vector<int>& plain,
+inline URLString Utility::get_visualization_url(const cpp_int& p, const cpp_int& q,
+                                                const cpp_int& n, const cpp_int& t,
+                                                const key& e, const key& d,
+                                                const std::vector<int>& plain,
                                                 const std::vector<int>& cipher) {
 	bridges::Bridges bridges(BRIDGES_ASSIGNMENT, BRIDGES_USERNAME, BRIDGES_APIKEY);
 
+	// ---- slide 1: the keypair -------------------------------------------
+	{
+		bridges::datastructure::GraphAdjList<string, string, string> keys;
+		for (const char* k : {"p", "q", "N", "T", "e", "d"}) keys.addVertex(k, "");
+
+		keys.getVertex("p")->setLabel(node_text("p", p));
+		keys.getVertex("q")->setLabel(node_text("q", q));
+		keys.getVertex("N")->setLabel(node_text("N", n));
+		keys.getVertex("T")->setLabel(node_text("T", t));
+		keys.getVertex("e")->setLabel(node_text("e", e));
+		keys.getVertex("d")->setLabel(node_text("d", d));
+
+		// Colour says one thing and one thing only: who is allowed to see it.
+		// Gold travels; red never leaves the machine that made it. Somebody
+		// who knows no RSA still reads two groups off this picture.
+		const bridges::Color PUBLIC(255, 209, 0);
+		const bridges::Color SECRET(226, 42, 74);
+		for (const char* k : {"N", "e"}) {
+			keys.getVertex(k)->setColor(PUBLIC);
+			keys.getVertex(k)->setShape(bridges::STAR);
+			keys.getVertex(k)->setSize(48.0);
+		}
+		for (const char* k : {"p", "q", "d"}) {
+			keys.getVertex(k)->setColor(SECRET);
+			keys.getVertex(k)->setShape(bridges::SQUARE);
+			keys.getVertex(k)->setSize(34.0);
+		}
+		keys.getVertex("T")->setColor(bridges::Color(150, 120, 190));
+		keys.getVertex("T")->setShape(bridges::DIAMOND);
+		keys.getVertex("T")->setSize(30.0);
+
+		// Placed by hand, left to right in derivation order. Without this the
+		// force layout scatters six nodes into a shape that means nothing.
+		keys.getVertex("p")->setLocation(0.0,  1.0);
+		keys.getVertex("q")->setLocation(0.0, -1.0);
+		keys.getVertex("N")->setLocation(1.6,  1.2);
+		keys.getVertex("T")->setLocation(1.6, -1.2);
+		keys.getVertex("e")->setLocation(3.2, -0.2);
+		keys.getVertex("d")->setLocation(4.6, -1.2);
+
+		keys.addEdge("p", "N"); keys.addEdge("q", "N");
+		keys.addEdge("p", "T"); keys.addEdge("q", "T");
+		keys.addEdge("T", "e"); keys.addEdge("T", "d");
+		keys.addEdge("e", "d");
+		// Edges carry structure, not arithmetic. No formulas on them on
+		// purpose -- how T and d are computed is exam material, and a
+		// visualisation is a poor place to put an answer key.
+		for (auto pair : {std::pair<const char*, const char*>{"p", "N"}, {"q", "N"},
+		                  {"p", "T"}, {"q", "T"}, {"T", "e"}, {"T", "d"}, {"e", "d"}}) {
+			auto* link = keys.getLinkVisualizer(pair.first, pair.second);
+			link->setThickness(2.5);
+			link->setColor(bridges::Color(150, 150, 160));
+		}
+
+		bridges.setDataStructure(&keys);
+		bridges.visualize();
+	}
+
+	// ---- slide 2: the same message, before and after ---------------------
 	const int COLS = 48;
 	const int GAP  = 2;                       // dark rule between the bands
 	const auto rows_for = [&](std::size_t n) {
@@ -181,8 +264,10 @@ inline URLString Utility::get_visualization_url(const std::vector<int>& plain,
 		grid.set(top + GAP + static_cast<int>(i / COLS), static_cast<int>(i % COLS),
 		         byte_hue(cipher[i] & 0xff));
 
-	bridges.setDataStructure(&grid);
-	bridges.visualize();   // throws on a bad key, a dead server, or a 413
+	if (!plain.empty() || !cipher.empty()) {
+		bridges.setDataStructure(&grid);
+		bridges.visualize();   // throws on a bad key, a dead server, or a 413
+	}
 
 	// Ask the library rather than rebuilding the string. Bridges.h builds it
 	// from BASE_URL, which is http:// and not https://, and it uses the

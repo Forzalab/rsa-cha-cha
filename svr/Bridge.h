@@ -31,6 +31,30 @@ inline std::string one_line(std::string text, std::size_t cap = 160) {
     return text;
 }
 
+// The graph slide needs a real keypair. Generated once, on the first click,
+// and kept -- so repeat clicks redraw the same one instead of inventing a new
+// set of numbers every time somebody taps the button during a demo.
+inline constexpr prime_size BRIDGES_DEMO_DIGITS = 72;   // matches PRIME_DIGITS in cli/src/lib/rsa.js
+
+struct DemoKeys {
+    cpp_int p, q, n, t;
+    key e, d;
+    DemoKeys() {
+        p = Utility::get_new_prime(BRIDGES_DEMO_DIGITS);
+        q = Utility::get_new_prime(BRIDGES_DEMO_DIGITS);
+        while (q == p) q = Utility::get_new_prime(BRIDGES_DEMO_DIGITS);
+        n = Utility::N(p, q);
+        t = Utility::T(p, q);
+        e = Utility::E(t, n);
+        d = Utility::D(e, t);
+    }
+};
+
+inline const DemoKeys& demo_keys() {
+    static const DemoKeys keys;
+    return keys;
+}
+
 inline bool bridges_configured() {
     return !BRIDGES_USERNAME.empty() && !BRIDGES_APIKEY.empty();
 }
@@ -47,14 +71,13 @@ inline constexpr std::size_t BRIDGE_MAX_BYTES = 4096;
 inline BridgeReply make_visualization(std::vector<int> plain, std::vector<int> cipher) {
     if (!bridges_configured())
         return {false, "", "BRIDGES credentials are not filled in on the server."};
-    if (plain.empty() && cipher.empty())
-        return {false, "", "Nothing to draw -- send a message first."};
-
     if (plain.size()  > BRIDGE_MAX_BYTES) plain.resize(BRIDGE_MAX_BYTES);
     if (cipher.size() > BRIDGE_MAX_BYTES) cipher.resize(BRIDGE_MAX_BYTES);
 
     try {
-        return {true, Utility::get_visualization_url(plain, cipher), ""};
+        const DemoKeys& k = demo_keys();
+        return {true, Utility::get_visualization_url(k.p, k.q, k.n, k.t, k.e, k.d,
+                                                     plain, cipher), ""};
     } catch (const std::string& text) {
         return {false, "", "BRIDGES rejected the post: " + one_line(text)};
     } catch (const std::exception& error) {

@@ -254,12 +254,9 @@ export function useChatSocket(url = import.meta.env.VITE_WS_URL || DEFAULT_URL) 
     }
     if (bridgePendingRef.current) return
     bridgePendingRef.current = done
+    // No message yet is fine -- the keypair slide stands on its own and the
+    // byte slide is simply skipped server-side.
     const { plain, cipher } = bridgeBytes()
-    if (!plain.length) {
-      bridgePendingRef.current = null
-      done?.({ ok: false, detail: 'Send a message first -- there is nothing to draw.' })
-      return
-    }
     socket.send(JSON.stringify(bridgesRequest(username, plain, cipher)))
     window.setTimeout(() => {
       const late = bridgePendingRef.current
