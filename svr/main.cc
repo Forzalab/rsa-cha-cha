@@ -32,7 +32,7 @@ int selftest() {
     const cpp_int q = Utility::get_new_prime(SELFTEST_DIGITS);
     const cpp_int n = Utility::N(p, q);
     const cpp_int t = Utility::T(p, q);
-    const key     e = Utility::E(t);
+    const key     e = Utility::E(t, n);
     const key     d = Utility::D(e, t);
 
     std::cout << "p = " << p << "\nq = " << q << "\n"
