@@ -31,7 +31,8 @@ class Utility {
 		static cpp_int get_new_prime(prime_size size);
 		static cpp_int N(const cpp_int& p, const cpp_int& q);
 		static cpp_int T(const cpp_int& p, const cpp_int& q); // totient
-		static key E(const cpp_int& t); /// google for what e should be
+		static bool is_small_prime(const cpp_int& x);
+		static key E(const cpp_int& t, const cpp_int& n); /// 65537 unless N is smaller
 		static key D(const key& e, const cpp_int& t);
 		static URLString get_visualization_url(const cpp_int& p, const cpp_int& q, const cpp_int& n, const cpp_int& t, const key& e, const key& d); // MUST return a string - param can be anything u please. if change param, change it both at declaration + definition, or u will get compile err
 		static bridges::Bridges get_bridges();
@@ -77,16 +78,27 @@ inline cpp_int Utility::T(const cpp_int& p, const cpp_int& q) {
 	return T;
 }
 
-inline key Utility::E(const cpp_int& n) {
-	cpp_int E = 65537;
-	if(gcd(E, n) == 1){
-		return E;
-	}    
-	E = 3;
-	while (gcd(E,n) != 1){
-		E += 2;
+// Trial division is enough here. E is always tiny -- 65537 at the top, and
+// the fallback only runs when N is smaller than that.
+inline bool Utility::is_small_prime(const cpp_int& x) {
+	if (x < 2) return false;
+	for (cpp_int f = 2; f * f <= x; ++f) {
+		if (x % f == 0) return false;
 	}
-	return E;
+	return true;
+}
+
+// Kerney's spec: use 65537 for E, unless N is smaller than that, in which
+// case pick a prime smaller than N. Coprimality with T is the extra
+// condition -- without it D does not exist at all.
+inline key Utility::E(const cpp_int& t, const cpp_int& n) {
+	const cpp_int preferred = 65537;
+	if (n > preferred && gcd(preferred, t) == 1) return preferred;
+
+	for (cpp_int candidate = 3; candidate < n; candidate += 2) {
+		if (is_small_prime(candidate) && gcd(candidate, t) == 1) return candidate;
+	}
+	return 0; // no usable exponent for this modulus
 }
 inline key Utility::D(const key& e, const cpp_int& n) {
 	cpp_int old_r = e, r = n;

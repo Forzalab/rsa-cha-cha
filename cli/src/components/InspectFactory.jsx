@@ -303,6 +303,11 @@ const STAGE_OF = { pack: 2, lock: 3, wire: 4 }
 
 export function InspectFactory({ message, keypair, onClose, onRitual }) {
   const [draft, setDraft] = useState(message?.plaintext || 'HELLO')
+  // Which end of the line is the source. 'back' makes station 5 drive and
+  // station 1 mirror, which is the shape of decrypting a message you were
+  // handed rather than composing one.
+  const [dir, setDir] = useState('fwd')
+  const [out, setOut] = useState(message?.plaintext || 'HELLO')
   const [ray, setRay] = useState(null)
   const [beam, setBeam] = useState(null)
   const [sealAt, setSealAt] = useState(null)
@@ -324,8 +329,11 @@ export function InspectFactory({ message, keypair, onClose, onRitual }) {
   const D = BigInt(keypair.privateKey.value)
   const limit = maxBytesFor(keypair.publicKey.modulus)
 
+  // The math never changes with direction. Only the string feeding it does.
+  const source = dir === 'back' ? out : draft
+
   const line = useMemo(() => {
-    const text = clipBytes(draft, limit)
+    const text = clipBytes(source, limit)
     const m = decimalFromText(text).toString()
     const mWire = ray?.target === 'pack' ? flipAt(m, Math.min(ray.at, m.length - 1), ray.digit) : m
     const cipher = modPow(BigInt(mWire), E, N).toString()
@@ -338,11 +346,14 @@ export function InspectFactory({ message, keypair, onClose, onRitual }) {
     let attested
     try { attested = textFromDecimal(modPow(BigInt(sigShown), E, N)) } catch { attested = '' }
     return { text, m: mWire, cipher: cipherShown, wire, recovered, sig: sigShown, attested, ok: recovered === text, sigOk: attested === text }
-  }, [draft, ray, E, N, D, limit])
+  }, [source, ray, E, N, D, limit])
 
   // Damage cascades: a hit at stage i breaks every stage from i onward.
   const hitStage = ray ? STAGE_OF[ray.target] : Infinity
-  const broken = (stage) => stage >= hitStage
+  // Damage always travels downstream. Downstream flips with the direction.
+  const broken = (stage) => (dir === 'back'
+    ? ray != null && stage <= hitStage
+    : stage >= hitStage)
   const toneOf = (stage) => (broken(stage) ? 'danger' : 'idle')
   const rogueOf = (t, v) => (ray?.target === t ? Math.min(ray.at, String(v).length - 1) : null)
 
@@ -413,7 +424,18 @@ export function InspectFactory({ message, keypair, onClose, onRitual }) {
     setTimeout(() => coin.remove(), 700)
   }
 
-  const bytes = new TextEncoder().encode(draft).length
+  // Both boxes feed the same counter, so the gauge, the coins, the eye and the
+  // quake behave identically whichever end you are typing into.
+  const typeInto = (which) => (event) => {
+    const value = event.target.value
+    if (which === 'back') { setDir('back'); setOut(value); setDraft(value) }
+    else { setDir('fwd'); setDraft(value); setOut(value) }
+    setRay(null); setSealAt(null); setPulse(Date.now())
+    feed(value.length)
+    if (heat > 0.4 && Math.random() < 0.15) burstCoin()
+  }
+
+  const bytes = new TextEncoder().encode(source).length
   const fuel = Math.min(1, bytes / limit)
   const over = bytes > limit
 
@@ -449,42 +471,45 @@ export function InspectFactory({ message, keypair, onClose, onRitual }) {
 
         <div className="relative z-10 mb-4 flex items-center gap-3">
           <span className="font-mono text-[10px] text-[#f4e4c1]/45">🔑 {E.toString()} · {shorten(N.toString(), 10)}</span>
+          <button type="button" onClick={() => setDir(dir === 'fwd' ? 'back' : 'fwd')}
+            className="border border-[#ffd100]/50 px-2 py-0.5 font-mono text-[10px] text-[#ffd100] hover:bg-[#ffd100] hover:text-[#4a0410]">
+            {dir === 'fwd' ? '1 ▸ 5  encrypt' : '5 ▸ 1  decrypt'}
+          </button>
           <button type="button" onClick={onClose} aria-label="close" className="ml-auto grid h-7 w-7 place-items-center border-2 border-[#ffd100]/60 font-mono text-[#ffd100] hover:bg-[#ffd100] hover:text-[#4a0410]">×</button>
         </div>
 
         <div className="relative z-10 overflow-x-auto">
           <div className="grid w-max" style={{ gridTemplateColumns: 'auto 4rem auto 4rem auto', gridTemplateRows: 'auto 7rem auto' }}>
 
-            <Station n={<Counter value={wpm} hot={tier >= 1} rage={tier >= 2} />} tone="hot"
+            <Station n={<Counter value={wpm} hot={tier >= 1} rage={tier >= 2} />} tone={dir === 'fwd' ? 'hot' : 'idle'}
               footer={<DeskLamp lit={!!pulse} />}
               rail={<><GloryGauge wpm={wpm} ratchet={ratchet} />{tip && <span className="tip-bubble">{draft.length === 0 ? FIRST_LINE : tooltipLine()}</span>}</>}>
-              <textarea value={draft} rows={3}
-                onChange={(e) => {
-                  setDraft(e.target.value); setRay(null); setSealAt(null); setPulse(Date.now())
-                  feed(e.target.value.length)
-                  if (heat > 0.4 && Math.random() < 0.15) burstCoin()
-                }}
+              <textarea value={source} rows={3} onChange={typeInto('fwd')}
                 className="w-full resize-none bg-transparent font-mono text-[11px] text-white caret-[#ffd100] outline-none" />
               <div className="mt-1 h-1.5 w-full bg-black/50">
                 <div className={`h-full transition-all ${over ? 'bg-[#ff2d78]' : fuel < 0.75 ? 'bg-[#2dd4bf]' : 'bg-[#ffd100]'}`} style={{ width: `${fuel * 100}%` }} />
               </div>
             </Station>
-            <Pipe digits={bits(line.m, 6)} heat={heat} dead={broken(2)} />
+            <Pipe digits={bits(line.m, 6)} heat={heat} dead={broken(2)} reversed={dir === 'back'} />
             <Station n="2" tone={toneOf(2)} innerRef={refs.pack} seal={!broken(2)} onSeal={() => setSealAt(sealAt === 2 ? null : 2)}>
               <Digits value={line.m} rogueAt={rogueOf('pack', line.m)} />
             </Station>
-            <Pipe digits={bits(line.cipher, 6)} heat={heat} dead={broken(3)} />
+            <Pipe digits={bits(line.cipher, 6)} heat={heat} dead={broken(3)} reversed={dir === 'back'} />
             <Station n="3" tone={toneOf(3)} innerRef={refs.lock} seal={!broken(3)} onSeal={() => setSealAt(sealAt === 3 ? null : 3)}>
               <Digits value={line.cipher} rogueAt={rogueOf('lock', line.cipher)} />
             </Station>
 
             <div className="col-span-4 grid translate-y-2 place-items-center" ref={starRef}><RayStar armed={!!ray} onFire={fire} eye={tier >= 2 ? Math.min(1, (wpm - 100) / 30 + 0.35) : 0} gaze={gaze} /></div>
-            <div className="grid place-items-center"><Pipe digits={bits(line.wire, 4)} heat={heat} reversed dead={broken(4)} className="pipe-v" /></div>
+            <div className="grid place-items-center"><Pipe digits={bits(line.wire, 4)} heat={heat} reversed={dir === 'fwd'} dead={broken(4)} className="pipe-v" /></div>
 
-            <Station n="5" tone={toneOf(5)} seal={line.sigOk} onSeal={() => setSealAt(sealAt === 5 ? null : 5)}>
-              {line.recovered || '□□□'}
+            <Station n="5" tone={dir === 'back' && !broken(5) ? 'hot' : toneOf(5)} seal={line.sigOk} onSeal={() => setSealAt(sealAt === 5 ? null : 5)}
+              footer={<DeskLamp lit={!!pulse} />}>
+              <textarea rows={3} onChange={typeInto('back')}
+                value={dir === 'back' ? out : (line.recovered || '')}
+                placeholder="□□□"
+                className={`w-full resize-none bg-transparent font-mono text-[11px] caret-[#ffd100] outline-none placeholder:text-[#fff6dc]/30 ${line.ok ? 'text-white' : 'text-[#ff2d78]'}`} />
             </Station>
-            <Pipe digits={bits(line.wire, 10)} heat={heat} reversed dead={broken(5)} className="col-span-3" />
+            <Pipe digits={bits(line.wire, 10)} heat={heat} reversed={dir === 'fwd'} dead={broken(5)} className="col-span-3" />
             <Station n="4" tone={toneOf(4)} innerRef={refs.wire} seal={!broken(4)} onSeal={() => setSealAt(sealAt === 4 ? null : 4)}>
               <Digits value={line.wire} rogueAt={rogueOf('wire', line.wire)} />
             </Station>

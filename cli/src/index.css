@@ -863,17 +863,45 @@ summary, [role="button"] { cursor: pointer; }
    Fixed layer, bottom-right. A column fills upward; when it runs out of
    height the next column starts to its left, over the chat. Nothing about
    this respects the sidebar any more. That is the joke. */
-.ad-swarm { position: fixed; inset: 0; z-index: 45; pointer-events: none;
-  display: flex; flex-flow: column wrap-reverse;
-  align-content: flex-start; justify-content: flex-end;
-  gap: 6px; padding: 8px; direction: rtl; }
-.ad-swarm > * { direction: ltr; pointer-events: auto; }
+.ad-swarm { 
+ /* --ad-w is the only lever. The swarm is a viewport overlay, so there is no
+   parent column to stretch into -- the card width IS the column width, and
+   every extra column is one card wide. Turn this number, nothing else. */
+ --ad-w: min(340px, 82vw);
+  position: fixed; 
+  inset: 0; 
+  z-index: 45; 
+  pointer-events: none;
+  display: flex; 
+  flex-flow: column wrap-reverse; 
+  direction: rtl;
+  align-content: flex-start; 
+  align-items: stretch; /* Centers items horizontally within the column track */
+  justify-content: flex-end;
+  gap: 6px; 
+  padding: 8px; 
+}
+@media (min-width: 768px) { .ad-swarm { --ad-w: clamp(220px, 20vw, 300px); } }
+
+/* 1. Apply the column width to the child elements */
+.ad-swarm > * { 
+  pointer-events: auto; 
+  width: var(--ad-w); /* Forces the items to stretch to your defined width */
+  box-sizing: border-box;
+}
+
+/* 2. Ensure any images inside the ads stretch to fill this new container width */
+.ad-swarm > * img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
 
 /* ------------------------------------------------------------------- a card
    Shared furniture. Every skin below only repaints the four variables and
    the three type rules. */
 .cj-card { --paper: #fff8ee; --ink: #1a0509; --accent: #c0392b; --sub: #6b5836;
-  position: relative; width: 200px; overflow: hidden;
+  position: relative; width: var(--ad-w, 200px); overflow: hidden;
   background: var(--paper); border: 3px solid var(--ink);
   box-shadow: 4px 4px 0 rgba(0,0,0,.55);
   font-family: 'Baloo 2', 'Comic Neue', cursive;
@@ -922,8 +950,7 @@ summary, [role="button"] { cursor: pointer; }
 
 /* --- Decoder ring. A Christmas Story: cream stock, black rules, red script
        with a green keyline, serif fine print. */
-.cj-card--xmas { --paper: #f6f3ea; --ink: #14100c; --accent: #c8102e; --sub: #3c3a33;
-  border-width: 2px; }
+.cj-card--xmas { --paper: #f6f3ea; --ink: #14100c; --accent: #c8102e; --sub: #3c3a33; }
 .cj-card--xmas .cj-dots { opacity: 0; }
 .cj-card--xmas .cj-body { padding-top: 12px; }
 .cj-card--xmas .cj-body::before, .cj-card--xmas .cj-body::after {

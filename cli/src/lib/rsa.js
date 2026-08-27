@@ -126,6 +126,25 @@ export function getNewPrime(digits = PRIME_DIGITS) {
   return candidate
 }
 
+// Kerney's spec: 65537 for E, unless N is smaller than that, in which case a
+// prime smaller than N. Coprimality with T is the extra condition -- D is the
+// inverse of E, and an inverse only exists when gcd(E, T) is 1.
+export function chooseExponent(n, t) {
+  const preferred = 65537n
+  if (n > preferred && gcd(preferred, t) === 1n) return preferred
+
+  for (const candidate of SMALL_PRIMES) {
+    if (candidate < 3n) continue
+    if (candidate >= n) break
+    if (gcd(candidate, t) === 1n) return candidate
+  }
+  // SMALL_PRIMES stops at 1000. Keep walking for the rare wide gap.
+  for (let candidate = 1001n; candidate < n && candidate < preferred; candidate += 2n) {
+    if (millerRabin(candidate) && gcd(candidate, t) === 1n) return candidate
+  }
+  throw new Error('No usable public exponent for this modulus.')
+}
+
 // ---------------------------------------------------------------- keygen
 
 export function generateKeypair(digits = PRIME_DIGITS) {
@@ -136,11 +155,7 @@ export function generateKeypair(digits = PRIME_DIGITS) {
   const n = p * q
   const t = (p - 1n) * (q - 1n)
 
-  let e = 65537n
-  if (gcd(e, t) !== 1n) {
-    e = 3n
-    while (gcd(e, t) !== 1n) e += 2n
-  }
+  const e = chooseExponent(n, t)
   const d = modInverse(e, t)
 
   return {
