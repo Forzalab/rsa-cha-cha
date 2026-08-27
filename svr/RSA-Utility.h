@@ -230,9 +230,7 @@ inline URLString Utility::get_visualization_url(const cpp_int& p, const cpp_int&
 		keys.addEdge("p", "T"); keys.addEdge("q", "T");
 		keys.addEdge("T", "e"); keys.addEdge("T", "d");
 		keys.addEdge("e", "d");
-		// Edges carry structure, not arithmetic. No formulas on them on
-		// purpose -- how T and d are computed is exam material, and a
-		// visualisation is a poor place to put an answer key.
+		// Edges carry structure, not arithmetic. 
 		for (auto pair : {std::pair<const char*, const char*>{"p", "N"}, {"q", "N"},
 		                  {"p", "T"}, {"q", "T"}, {"T", "e"}, {"T", "d"}, {"e", "d"}}) {
 			auto* link = keys.getLinkVisualizer(pair.first, pair.second);
