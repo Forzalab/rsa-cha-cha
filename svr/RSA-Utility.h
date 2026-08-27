@@ -14,6 +14,7 @@
 #include <vector>
 #include <algorithm>
 #include <cstddef>
+#include <chrono>
 
 using namespace std; // for convieniece
 
@@ -188,6 +189,19 @@ inline URLString Utility::get_visualization_url(const cpp_int& p, const cpp_int&
 
 	// ---- slide 1: the keypair -------------------------------------------
 	{
+		// Measured against the live renderer, three configurations:
+		//   locations + setWindow  -> spread, fills the canvas
+		//   locations, no window   -> same layout, drawn tiny in a corner
+		//   no locations at all    -> every node piled on one spot
+		// So locations are effectively mandatory, and setWindow is what makes
+		// the viewport match their extent instead of some default.
+		//
+		// Careful: the real signature is (xmin, xmax, ymin, ymax). The doc
+		// comment above it in Bridges.h says (xmin, ymin, xmax, ymax) and is
+		// wrong -- the body pushes back x, x, y, y.
+		bridges.setCoordSystemType("window");
+		bridges.setWindow(0.0, 1050.0, 0.0, 720.0);
+
 		bridges::datastructure::GraphAdjList<string, string, string> keys;
 		for (const char* k : {"p", "q", "N", "T", "e", "d"}) keys.addVertex(k, "");
 
@@ -217,14 +231,26 @@ inline URLString Utility::get_visualization_url(const cpp_int& p, const cpp_int&
 		keys.getVertex("T")->setShape(bridges::DIAMOND);
 		keys.getVertex("T")->setSize(30.0);
 
-		// Placed by hand, left to right in derivation order. Without this the
-		// force layout scatters six nodes into a shape that means nothing.
-		keys.getVertex("p")->setLocation(0.0,  1.0);
-		keys.getVertex("q")->setLocation(0.0, -1.0);
-		keys.getVertex("N")->setLocation(1.6,  1.2);
-		keys.getVertex("T")->setLocation(1.6, -1.2);
-		keys.getVertex("e")->setLocation(3.2, -0.2);
-		keys.getVertex("d")->setLocation(4.6, -1.2);
+		// setLocation values reach the renderer unchanged, so they are real
+		// units, not a normalised range.
+		//
+		// p and q each feed BOTH N and T, so those four form K(2,2). Drawn as
+		// two columns that graph cannot avoid p->T crossing q->N. K(2,2) is
+		// planar though: seat the four on a diamond and the same four edges
+		// become its sides, crossing nothing. The tail runs off the near
+		// corner.
+		//
+		//          N              p, q  the primes, left and right
+		//        /   \            N     public modulus, far corner
+		//       p     q           T     private intermediate, near corner
+		//        \   /
+		//          T  --> e --> d
+		keys.getVertex("p")->setLocation(120.0, 350.0);
+		keys.getVertex("N")->setLocation(340.0, 620.0);
+		keys.getVertex("q")->setLocation(560.0, 350.0);
+		keys.getVertex("T")->setLocation(340.0,  90.0);
+		keys.getVertex("e")->setLocation(720.0, 170.0);
+		keys.getVertex("d")->setLocation(950.0, 320.0);
 
 		keys.addEdge("p", "N"); keys.addEdge("q", "N");
 		keys.addEdge("p", "T"); keys.addEdge("q", "T");
@@ -234,8 +260,14 @@ inline URLString Utility::get_visualization_url(const cpp_int& p, const cpp_int&
 		for (auto pair : {std::pair<const char*, const char*>{"p", "N"}, {"q", "N"},
 		                  {"p", "T"}, {"q", "T"}, {"T", "e"}, {"T", "d"}, {"e", "d"}}) {
 			auto* link = keys.getLinkVisualizer(pair.first, pair.second);
-			link->setThickness(2.5);
-			link->setColor(bridges::Color(150, 150, 160));
+			link->setThickness(3.0);
+			// An arrowhead on a curve that overlaps three others is unreadable.
+			// Colour each edge like the node it feeds instead: gold arrives at
+			// N and e, purple at T, red at d.
+			const std::string dest = pair.second;
+			link->setColor(dest == "N" || dest == "e" ? bridges::Color(214, 170, 0)
+			             : dest == "T"                ? bridges::Color(150, 120, 190)
+			                                          : bridges::Color(200, 60, 80));
 		}
 
 		bridges.setDataStructure(&keys);
@@ -267,11 +299,17 @@ inline URLString Utility::get_visualization_url(const cpp_int& p, const cpp_int&
 		bridges.visualize();   // throws on a bad key, a dead server, or a 413
 	}
 
+	// The assignment page is served from cache, so a repost can keep showing
+	// the previous drawing. BRIDGES routes on the path, so a throwaway query
+	// string is ignored by their front end and treated as a new address by the
+	// browser. Verified: both forms return 200.
 	// Ask the library rather than rebuilding the string. Bridges.h builds it
 	// from BASE_URL, which is http:// and not https://, and it uses the
 	// assignment number it actually posted to. A hand-written copy drifts the
 	// first time either of those moves.
-	return URLString(bridges.getVisualizeURL());
+	return URLString(bridges.getVisualizeURL() + "?t=" +
+	                 std::to_string(std::chrono::duration_cast<std::chrono::seconds>(
+	                     std::chrono::system_clock::now().time_since_epoch()).count()));
 }
 
 #endif
