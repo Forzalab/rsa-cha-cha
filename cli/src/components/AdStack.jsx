@@ -199,7 +199,10 @@ export function AdStack() {
     <>
       <div ref={anchorRef} aria-hidden="true" className="h-0 w-full" />
       <div className="ad-swarm" aria-label="advertisements"
-        style={band ? { left: `${band.left - 8}px`, '--ad-w': `${band.width}px` } : undefined}>
+        style={band ? {
+          left: `${band.left}px`, right: 'auto', width: `${band.width}px`,
+          padding: 0, '--ad-w': `${band.width}px`,
+        } : undefined}>
         {cards.map((card) => (
           <AdCard key={card.id} seed={card.id} stage={stage} onDismiss={() => dismiss(card.id)} />
         ))}

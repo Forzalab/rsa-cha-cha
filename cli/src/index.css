@@ -876,11 +876,12 @@ summary, [role="button"] { cursor: pointer; }
   pointer-events: none;
   display: flex;
   flex-flow: column wrap;
-  align-content: flex-start;
+  align-content: center;
   align-items: stretch;
   justify-content: flex-end;
   gap: 6px;
   padding: 8px;
+  padding-bottom: 14px;
 }
 .ad-swarm > * {
   pointer-events: auto;
@@ -895,8 +896,8 @@ summary, [role="button"] { cursor: pointer; }
    the three type rules. */
 .cj-card { --paper: #fff8ee; --ink: #1a0509; --accent: #c0392b; --sub: #6b5836;
   position: relative; width: var(--ad-w, 200px); overflow: hidden;
-  background: var(--paper); border: 3px solid var(--ink);
-  box-shadow: 4px 4px 0 rgba(0,0,0,.55);
+  background: var(--paper); border: 1px solid rgba(0,0,0,.22);
+  box-shadow: 0 1px 2px rgba(0,0,0,.30);
   font-family: 'Baloo 2', 'Comic Neue', cursive;
   animation: cj-in .22s cubic-bezier(.2,1.4,.4,1); }
 @keyframes cj-in {
@@ -976,8 +977,8 @@ summary, [role="button"] { cursor: pointer; }
 /* --- Enigma Co. Steel plate, stencil caps, a part number in mono. */
 .cj-card--enigma { --paper: #3a3f45; --ink: #e6eaed; --accent: #9aa4ad; --sub: #aeb6bd;
   background: linear-gradient(160deg, #52585f 0%, #3a3f45 46%, #24272b 100%);
-  border-color: #14171a;
-  box-shadow: 4px 4px 0 rgba(0,0,0,.65), inset 0 1px 0 rgba(255,255,255,.16); }
+  border-color: rgba(0,0,0,.35);
+  box-shadow: 0 1px 2px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.16); }
 .cj-card--enigma .cj-dots { opacity: .1;
   background-image: radial-gradient(#0b0d0f 1px, transparent 1.2px);
   background-size: 4px 4px; }
@@ -993,7 +994,7 @@ summary, [role="button"] { cursor: pointer; }
 
 /* --- 素数. Poster red, gold serif, the only skin that belongs to the room. */
 .cj-card--primes { --paper: #8a0a1c; --ink: #ffd100; --accent: #ffe873; --sub: #f4e4c1;
-  border-color: #ffd100; }
+  border-color: rgba(255,209,0,.35); }
 .cj-card--primes .cj-dots { opacity: .12;
   background-image: radial-gradient(#ffd100 1px, transparent 1.2px); }
 .cj-card--primes .cj-top { font-family: 'Noto Serif SC', serif; font-weight: 900;
