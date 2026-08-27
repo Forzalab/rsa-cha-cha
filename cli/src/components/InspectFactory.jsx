@@ -273,6 +273,13 @@ function useWpm() {
     recompute()
   }, [recompute])
 
+  // A paste moves the text length without being typing. Resync slides the
+  // cursor past it silently; skipping it would make the next real keystroke
+  // compute a negative delta and go uncounted.
+  const resync = useCallback((len) => {
+    lastLen.current = len
+  }, [])
+
   const reset = useCallback(() => {
     events.current = []
     setWpm(0)
@@ -283,7 +290,7 @@ function useWpm() {
     return () => clearInterval(id)
   }, [recompute])
 
-  return { wpm, feed, reset }
+  return { wpm, feed, resync, reset }
 }
 
 // Fixed three reels. Leading zeros stay in the layout but go invisible, so
@@ -388,8 +395,12 @@ export function InspectFactory({ message, keypair, onClose, onRitual }) {
   // Which end of the line is the source. 'back' makes station 5 drive and
   // station 1 mirror, which is the shape of decrypting a message you were
   // handed rather than composing one.
+  // 'cipher' is the third source: station 3 holds a pasted ciphertext and the
+  // plaintext ends become read-outs. It is a number, so none of the text
+  // machinery (byte cap, packing) applies to it.
   const [dir, setDir] = useState('fwd')
   const [out, setOut] = useState(message?.plaintext || 'HELLO')
+  const [cipherDraft, setCipherDraft] = useState('')
   const [ray, setRay] = useState(null)
   const [beam, setBeam] = useState(null)
   const [sealAt, setSealAt] = useState(null)
@@ -403,7 +414,12 @@ export function InspectFactory({ message, keypair, onClose, onRitual }) {
   // { which, n } -- n alternates 1/2 so a held key keeps re-firing the shake.
   const [reject, setReject] = useState(null)
 
-  const { wpm, feed, reset: resetWpm } = useWpm()
+  const { wpm, feed, resync, reset: resetWpm } = useWpm()
+  // Set by onPaste, consumed by the next onChange. Pastes update text but are
+  // exempt from the wpm counter, the lamp, the coins, and the ritual chain.
+  const pasteRef = useRef(false)
+  // And the idle "faster, comrade" nag stays quiet until real typing resumes.
+  const pastedSinceKeyRef = useRef(false)
   const coinsRef = useRef(null)
   const lastTierRef = useRef(0)
 
@@ -420,6 +436,22 @@ export function InspectFactory({ message, keypair, onClose, onRitual }) {
   const source = dir === 'back' ? out : draft
 
   const line = useMemo(() => {
+    if (dir === 'cipher') {
+      const digits = cipherDraft
+      let m = 0n
+      let recovered = ''
+      if (digits) {
+        try {
+          m = modPow(BigInt(digits), D, N)
+          recovered = textFromDecimal(m)
+        } catch { recovered = '' }
+      }
+      // No signature lane: a pasted cipher carries no signature to verify,
+      // and pretending otherwise would put a red (!) on an honest decrypt.
+      return { text: recovered, m: m.toString(), cipher: digits || '0',
+               wire: digits || '0', recovered, sig: '', attested: '',
+               ok: !!digits && recovered !== '', sigOk: null }
+    }
     const text = clipBytes(source, limit)
     const m = decimalFromText(text).toString()
     const mWire = ray?.target === 'pack' ? flipAt(m, Math.min(ray.at, m.length - 1), ray.digit) : m
@@ -433,7 +465,7 @@ export function InspectFactory({ message, keypair, onClose, onRitual }) {
     let attested
     try { attested = textFromDecimal(modPow(BigInt(sigShown), E, N)) } catch { attested = '' }
     return { text, m: mWire, cipher: cipherShown, wire, recovered, sig: sigShown, attested, ok: recovered === text, sigOk: attested === text }
-  }, [source, ray, E, N, D, limit])
+  }, [source, cipherDraft, dir, ray, E, N, D, limit])
 
   // Damage cascades: a hit at stage i breaks every stage from i onward.
   const hitStage = ray ? STAGE_OF[ray.target] : Infinity
@@ -485,6 +517,9 @@ export function InspectFactory({ message, keypair, onClose, onRitual }) {
     if (wpm > 0) { setTip(false); return }
     let visible = false
     const id = setInterval(() => {
+      // Somebody who just pasted is not idling; taunting them for zero wpm
+      // over a full box reads as broken. Quiet until keys are struck again.
+      if (pastedSinceKeyRef.current) return
       visible = !visible
       setTip(visible)
       if (visible) setTimeout(() => setTip(false), 1500)
@@ -537,6 +572,8 @@ export function InspectFactory({ message, keypair, onClose, onRitual }) {
   // quake behave identically whichever end you are typing into.
   const typeInto = (which) => (event) => {
     const raw = event.target.value
+    const pasted = pasteRef.current
+    pasteRef.current = false
     // The modulus is the wall. Refuse the character and shake the plate --
     // that lands harder than a meter creeping toward a number nobody reads.
     const value = clipBytes(raw, limit)
@@ -544,12 +581,46 @@ export function InspectFactory({ message, keypair, onClose, onRitual }) {
     if (which === 'back') { setDir('back'); setOut(value); setDraft(value) }
     else { setDir('fwd'); setDraft(value); setOut(value) }
     setFlowKey(Date.now())
-    setRay(null); setSealAt(null); setPulse(Date.now())
+    setRay(null); setSealAt(null)
+    if (pasted) {
+      // Text lands, glory does not. The counter's length cursor still has to
+      // move or the next keystroke registers as a negative delta.
+      pastedSinceKeyRef.current = true
+      resync(value.length)
+      return
+    }
+    pastedSinceKeyRef.current = false
+    setPulse(Date.now())
     feed(value.length)
     if (heat > 0.4 && Math.random() < 0.15) burstCoin()
   }
 
+  // Station 3. Digits only, and the number stays under N -- anything else is
+  // refused outright with the same shake as the byte wall. A real ciphertext
+  // is already reduced mod N, so it always passes.
+  const typeCipher = (event) => {
+    const raw = event.target.value
+    const pasted = pasteRef.current
+    pasteRef.current = false
+    const digits = raw.replace(/[\s,]/g, '')
+    const bad = /\D/.test(digits) || (digits && BigInt(digits) >= N)
+    if (bad) {
+      setReject((r) => ({ which: 'cipher', n: r && r.n === 1 ? 2 : 1 }))
+      return
+    }
+    setDir('cipher')
+    setCipherDraft(digits)
+    setFlowKey(Date.now())
+    setRay(null); setSealAt(null)
+    if (pasted) { pastedSinceKeyRef.current = true; resync(digits.length); return }
+    pastedSinceKeyRef.current = false
+    setPulse(Date.now())
+    feed(digits.length)
+  }
+  const markPaste = () => { pasteRef.current = true }
+
   const fire = () => {
+    if (dir === 'cipher') return  // nothing to corrupt; the operator IS the ray
     const target = TARGETS[Math.floor(Math.random() * 3)]
     const from = starRef.current?.getBoundingClientRect()
     const to = refs[target].current?.getBoundingClientRect()
@@ -595,16 +666,23 @@ export function InspectFactory({ message, keypair, onClose, onRitual }) {
             <Station editable reject={reject?.which === 'fwd' ? reject.n : 0} n={dir === 'fwd' ? <Counter value={wpm} idle="1" hot={tier >= 1} rage={tier >= 2} /> : '1'} tone={dir === 'fwd' ? 'hot' : 'idle'}
               footer={<DeskLamp lit={!!pulse} />}
               rail={tip ? <span className="tip-bubble">{draft.length === 0 ? FIRST_LINE : tooltipLine()}</span> : null}>
-              <textarea value={source} rows={3} onChange={typeInto('fwd')}
-                className="w-full resize-none bg-transparent font-mono text-[11px] text-white caret-[#ffd100] outline-none" />
+              <textarea value={dir === 'cipher' ? (line.recovered || '') : source} rows={3}
+                onChange={typeInto('fwd')} onPaste={markPaste}
+                placeholder={dir === 'cipher' && !line.ok ? '\u25a1\u25a1\u25a1' : undefined}
+                className={`w-full resize-none bg-transparent font-mono text-[11px] caret-[#ffd100] outline-none placeholder:text-[#fff6dc]/30 ${dir === 'cipher' && !line.ok ? 'text-[#ff2d78]' : 'text-white'}`} />
             </Station>
             <Pipe digits={bits(line.m, 6)} heat={heat} flowKey={flowKey} dead={pipeDead(1, 2)} reversed={dir === 'back'} />
             <Station n="2" sealed tone={toneOf(2)} innerRef={refs.pack} seal={!broken(2)} onSeal={() => setSealAt(sealAt === 2 ? null : 2)}>
               <Digits value={line.m} rogueAt={rogueOf('pack', line.m)} />
             </Station>
             <Pipe digits={bits(line.cipher, 6)} heat={heat} flowKey={flowKey} dead={pipeDead(2, 3)} reversed={dir === 'back'} />
-            <Station n="3" sealed tone={toneOf(3)} innerRef={refs.lock} seal={!broken(3)} onSeal={() => setSealAt(sealAt === 3 ? null : 3)}>
-              <Digits value={line.cipher} rogueAt={rogueOf('lock', line.cipher)} />
+            <Station editable n="3" reject={reject?.which === 'cipher' ? reject.n : 0}
+              tone={dir === 'cipher' ? 'hot' : toneOf(3)} innerRef={refs.lock}
+              seal={dir === 'cipher' ? null : !broken(3)} onSeal={() => setSealAt(sealAt === 3 ? null : 3)}>
+              <textarea rows={3} onChange={typeCipher} onPaste={markPaste}
+                value={dir === 'cipher' ? cipherDraft : line.cipher}
+                placeholder="paste a cipher\u2026"
+                className="w-full resize-none bg-transparent font-mono text-[10px] text-[#fff6dc]/85 caret-[#ffd100] outline-none placeholder:text-[#fff6dc]/30" />
             </Station>
 
             <div className="col-span-4 grid translate-y-2 place-items-center" ref={starRef}><RayStar armed={!!ray} onFire={fire} eye={tier >= 2 ? Math.min(1, (wpm - 100) / 30 + 0.35) : 0} gaze={gaze} /></div>
@@ -612,7 +690,7 @@ export function InspectFactory({ message, keypair, onClose, onRitual }) {
 
             <Station editable reject={reject?.which === 'back' ? reject.n : 0} n={dir === 'back' ? <Counter value={wpm} idle="5" hot={tier >= 1} rage={tier >= 2} /> : '5'} tone={dir === 'back' && !broken(5) ? 'hot' : toneOf(5)} seal={line.sigOk} onSeal={() => setSealAt(sealAt === 5 ? null : 5)}
               footer={<DeskLamp lit={!!pulse} />}>
-              <textarea rows={3} onChange={typeInto('back')}
+              <textarea rows={3} onChange={typeInto('back')} onPaste={markPaste}
                 value={dir === 'back' ? out : (line.recovered || '')}
                 placeholder="□□□"
                 className={`w-full resize-none bg-transparent font-mono text-[11px] caret-[#ffd100] outline-none placeholder:text-[#fff6dc]/30 ${line.ok ? 'text-white' : 'text-[#ff2d78]'}`} />
@@ -624,7 +702,7 @@ export function InspectFactory({ message, keypair, onClose, onRitual }) {
           </div>
         </div>
 
-        {sealAt != null && (
+        {sealAt != null && dir !== 'cipher' && (
           <div className="relative z-20 mt-3 w-fit border-2 border-[#ffd100]/60 bg-[#12010a] p-2.5 font-mono text-[10px] leading-5 text-[#fff6dc]/85 shadow-[6px_6px_0_rgba(0,0,0,.5)]">
             <p className="break-all">m<sup>D</sup> mod N · <Digits value={line.sig} rogueAt={ray && ray.target !== 'pack' ? Math.min(ray.at, line.sig.length - 1) : null} /></p>
             <p>s<sup>E</sup> mod N · <span className={line.sigOk ? 'text-[#2dd4bf]' : 'text-[#ff2d78]'}>{line.sigOk ? `"${line.attested}"` : '□□□'}</span></p>
